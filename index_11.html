@@ -1,0 +1,3079 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>폼즈 AS — KICC AS 현황 대시보드</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E" type="image/svg+xml">
+
+<!-- Pretendard 폰트 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+:root{
+  --sidebar-bg:#1e293b;
+  --sidebar-text:#cbd5e1;
+  --sidebar-text-muted:#94a3b8;
+  --sidebar-active:#3b82f6;
+  --sidebar-hover:#334155;
+  --sidebar-border:rgba(255,255,255,.06);
+
+  --bg:#f1f5f9;
+  --surface:#ffffff;
+  --border:#e2e8f0;
+  --border-strong:#cbd5e1;
+  --text:#0f172a;
+  --text-2:#475569;
+  --text-3:#94a3b8;
+
+  --primary:#3b82f6;
+  --primary-2:#2563eb;
+  --primary-soft:#dbeafe;
+
+  --c-blue:#3b82f6;
+  --c-emerald:#10b981;
+  --c-amber:#f59e0b;
+  --c-purple:#a855f7;
+  --c-rose:#f43f5e;
+  --c-cyan:#06b6d4;
+  --c-slate:#64748b;
+
+  --shadow-sm:0 1px 2px 0 rgb(0 0 0 / .04), 0 1px 1px 0 rgb(0 0 0 / .03);
+  --shadow:0 1px 3px 0 rgb(0 0 0 / .06), 0 1px 2px -1px rgb(0 0 0 / .05);
+  --shadow-md:0 4px 6px -1px rgb(0 0 0 / .07), 0 2px 4px -2px rgb(0 0 0 / .05);
+
+  --radius:12px;
+  --radius-sm:8px;
+  --radius-lg:16px;
+}
+
+/* 다크 모드 — 사이드바는 그대로 어두운 색 유지, 메인 영역만 다크화 */
+:root[data-theme="dark"]{
+  --bg:#0b1220;
+  --surface:#111827;
+  --border:#1f2937;
+  --border-strong:#334155;
+  --text:#f1f5f9;
+  --text-2:#cbd5e1;
+  --text-3:#94a3b8;
+  --primary-soft:rgba(59,130,246,.18);
+  --shadow-sm:0 1px 2px 0 rgb(0 0 0 / .3), 0 1px 1px 0 rgb(0 0 0 / .2);
+  --shadow:0 1px 3px 0 rgb(0 0 0 / .35), 0 1px 2px -1px rgb(0 0 0 / .25);
+  --shadow-md:0 4px 6px -1px rgb(0 0 0 / .4), 0 2px 4px -2px rgb(0 0 0 / .3);
+}
+:root[data-theme="dark"] .filter-group{background:var(--surface)}
+:root[data-theme="dark"] .filter-group input[type="date"],
+:root[data-theme="dark"] .filter-group select,
+:root[data-theme="dark"] .filter-group input[type="text"]{color:var(--text)}
+:root[data-theme="dark"] .btn-reset{background:var(--surface);color:var(--text-2)}
+:root[data-theme="dark"] .btn-reset:hover{background:#1f2937}
+:root[data-theme="dark"] .pg-btn{background:var(--surface);color:var(--text-2)}
+:root[data-theme="dark"] .pg-btn:hover:not(:disabled){background:var(--primary-soft);color:#93c5fd}
+:root[data-theme="dark"] table thead{background:#0f172a}
+:root[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.8)}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+html{background:var(--bg);}
+body{zoom:0.9;}  /* ⭐ 100% 배율을 90% 스케일로 싱크 — 한 화면에 더 담김 (Firefox는 무시=기존 크기) */
+body{
+  font-family:'Pretendard Variable','Pretendard',-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;
+  font-feature-settings:'tnum';
+  background:var(--bg);
+  color:var(--text);
+  font-size:14px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit}
+input,select{font-family:inherit;font-size:inherit;color:inherit}
+a{color:inherit;text-decoration:none}
+
+/* ─────────────── Layout ─────────────── */
+.layout{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:calc(100vh / 0.9)}  /* ⭐ zoom 0.9 보정 */
+body{overflow-x:hidden}
+canvas,img{max-width:100%}
+.chart-wrap{max-width:100%;overflow:hidden}
+
+/* ─────────────── Sidebar ─────────────── */
+.sidebar{
+  background:var(--sidebar-bg);
+  color:var(--sidebar-text);
+  display:flex;flex-direction:column;
+  position:sticky;top:0;height:calc(100vh / 0.9);  /* ⭐ zoom 0.9 보정 */
+  padding:0;
+  border-right:1px solid var(--sidebar-border);
+}
+.sb-logo{
+  display:flex;flex-direction:column;align-items:flex-start;gap:7px;
+  padding:18px 20px 15px;
+  border-bottom:1px solid var(--sidebar-border);
+}
+.sb-logo .kicc-logo{height:22px;width:auto;display:block}
+.sb-logo .sb-sub{font-size:11px;font-weight:600;color:#fff;opacity:.72;letter-spacing:.01em;white-space:nowrap}
+.sb-nav{padding:14px 10px;display:flex;flex-direction:column;gap:2px;flex:1}
+.sb-item{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 12px;border-radius:8px;
+  color:var(--sidebar-text-muted);
+  font-size:13.5px;font-weight:500;
+  transition:background .15s,color .15s;
+  position:relative;
+}
+.sb-item:hover{background:var(--sidebar-hover);color:#fff}
+.sb-item.active{
+  background:var(--sidebar-active);
+  color:#fff;font-weight:600;
+  box-shadow:0 1px 2px rgba(59,130,246,.4);
+}
+.sb-item .ico{width:16px;height:16px;flex-shrink:0;opacity:.9}
+.sb-item .badge{
+  margin-left:auto;
+  background:var(--c-rose);color:#fff;
+  font-size:10.5px;font-weight:700;
+  width:18px;height:18px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+}
+.sb-foot{
+  padding:14px 16px;
+  border-top:1px solid var(--sidebar-border);
+}
+.sb-theme{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 12px;border-radius:8px;
+  background:rgba(255,255,255,.04);
+  color:var(--sidebar-text);
+  font-size:13px;font-weight:500;
+  width:100%;
+  transition:background .15s;
+}
+.sb-theme:hover{background:rgba(255,255,255,.08)}
+
+/* ─────────────── Main ─────────────── */
+.main{padding:18px 24px 40px;min-width:0;max-width:1760px;margin:0 auto;width:100%;}  /* ⭐ 초광폭(32인치 등)에서 콘텐츠 폭 상한 + 중앙 정렬 — 카드가 과도하게 늘어나 붕 떠 보이는 문제 방지 */
+
+/* Header */
+.header{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  margin-bottom:16px;gap:24px;
+}
+.header h1{
+  font-size:20px;font-weight:700;letter-spacing:-.015em;color:var(--text);
+  line-height:1.3;
+}
+.header .subtitle{font-size:12.5px;color:var(--text-3);margin-top:2px}
+.header-actions{display:flex;align-items:center;gap:12px}
+.update-info{
+  display:flex;align-items:center;gap:6px;
+  font-size:12px;color:var(--text-3);
+}
+.update-info .dot{width:6px;height:6px;border-radius:50%;background:var(--c-emerald)}
+.btn-export{
+  background:var(--c-emerald);color:#fff;font-weight:600;font-size:13px;
+  padding:8px 14px;border-radius:8px;
+  display:flex;align-items:center;gap:6px;
+  box-shadow:var(--shadow-sm);
+  transition:filter .15s,transform .1s;
+}
+.btn-export:hover{filter:brightness(1.05)}
+.btn-export:active{transform:translateY(1px)}
+
+/* Filter bar */
+.filter-bar{
+  display:flex;align-items:center;flex-wrap:wrap;gap:8px;
+  margin-bottom:14px;
+  position:relative;
+}
+/* 칩·필터박스 높이 통일 (삐뚤어짐 방지) */
+.filter-bar > .chip,
+.filter-bar > .filter-group{ min-height:36px; box-sizing:border-box; }
+.chip{
+  background:var(--surface);color:var(--text-2);
+  font-size:12.5px;font-weight:500;
+  padding:8px 14px;border-radius:9999px;
+  border:1px solid var(--border);
+  display:inline-flex;align-items:center;
+  transition:background .12s,color .12s,border-color .12s;
+}
+.chip:hover{border-color:var(--border-strong)}
+.chip.active{background:var(--primary);color:#fff;border-color:var(--primary);font-weight:600}
+:root[data-theme="dark"] .chip{background:var(--surface-2,#1e293b);color:var(--text-2);}
+:root[data-theme="dark"] .chip.active{background:var(--primary);color:#fff;}
+.filter-group{
+  display:flex;align-items:center;gap:6px;
+  background:#fff;border:1px solid var(--border);
+  border-radius:8px;padding:5px 10px;
+  font-size:12.5px;color:var(--text-2);
+}
+.filter-group .ico{width:14px;height:14px;color:var(--text-3)}
+.filter-group input[type="date"],
+.filter-group select,
+.filter-group input[type="text"]{
+  border:0;outline:0;background:transparent;
+  font-size:12.5px;color:var(--text);
+  min-width:auto;
+}
+.filter-group input[type="date"]{font-family:inherit}
+.filter-group input[type="text"]{width:160px}
+.filter-group .sep{color:var(--text-3);padding:0 2px}
+.btn-search{
+  background:var(--primary);color:#fff;font-weight:600;font-size:12.5px;
+  padding:7px 14px;border-radius:8px;
+  display:flex;align-items:center;gap:5px;
+  transition:background .12s;
+}
+.btn-search:hover{background:var(--primary-2)}
+.btn-reset{
+  background:#fff;color:var(--text-2);font-weight:500;font-size:12.5px;
+  padding:7px 12px;border-radius:8px;
+  border:1px solid var(--border);
+  display:flex;align-items:center;gap:5px;
+  transition:background .12s;
+}
+.btn-reset:hover{background:#f8fafc}
+.filter-actions{display:flex;flex-direction:row;gap:8px;align-items:center;flex-basis:100%;justify-content:flex-end;margin-top:2px}
+
+/* ⭐ 한 줄 필터바 (방식 가) */
+.filter-bar.onerow{flex-wrap:wrap;align-items:center;gap:8px;}  /* ⭐ 공간 부족 시 줄바꿈 — 우측 잘림 방지 (넓으면 그대로 한 줄) */
+@media (max-width:1100px){ .filter-bar.onerow{flex-wrap:wrap;} }
+.filter-bar.onerow .fb-div{width:0.5px;height:22px;background:var(--border);flex-shrink:0;}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;flex-shrink:0;}
+.seg-btn{font-size:12px;padding:8px 13px;background:var(--surface);color:var(--text-2);border:0;border-left:1px solid var(--border);transition:background .12s,color .12s;}
+.seg-btn:first-child{border-left:0;}
+.seg-btn.active{background:var(--primary);color:#fff;font-weight:600;}
+:root[data-theme="dark"] .seg-btn{background:var(--surface-2,#1e293b);}
+:root[data-theme="dark"] .seg-btn.active{background:var(--primary);color:#fff;}
+.fb-sel{flex-shrink:0;font-size:12.5px;padding:8px 11px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);outline:0;cursor:pointer;min-height:36px;}
+:root[data-theme="dark"] .fb-sel{background:var(--surface-2,#1e293b);}
+:root[data-theme="dark"] .fb-sel option{background:var(--surface-2,#1e293b);color:var(--text);}
+.fb-search{flex-shrink:0;width:170px;display:flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:8px;padding:0 11px;background:var(--surface);min-height:36px;}
+:root[data-theme="dark"] .fb-search{background:var(--surface-2,#1e293b);}
+.fb-search .ico{width:14px;height:14px;color:var(--text-3);flex-shrink:0;}
+.fb-search input{flex:1;border:0;outline:0;background:transparent;font-size:12.5px;color:var(--text);padding:8px 0;}
+.filter-bar.onerow .btn-search,.filter-bar.onerow .btn-reset{flex-shrink:0;min-height:36px;}
+.fb-actions{display:flex;gap:8px;flex-shrink:0;align-items:center;}
+.filter-bar.onerow .fb-search{flex-shrink:1;min-width:120px;}
+
+/* ⭐ 작은 칩 버튼 그룹 (분기/기종/수리유형) */
+.cgroup{display:inline-flex;gap:4px;flex-shrink:0;}
+.chip2{font-size:12px;padding:8px 11px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text-2);transition:background .12s,color .12s,border-color .12s;white-space:nowrap;}
+.chip2:hover{border-color:var(--border-strong);}
+.chip2.active{background:var(--primary);color:#fff;border-color:var(--primary);font-weight:600;}
+:root[data-theme="dark"] .chip2{background:var(--surface-2,#1e293b);}
+:root[data-theme="dark"] .chip2.active{background:var(--primary);color:#fff;}
+/* 날짜 지정 박스 */
+.fb-date{display:flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:8px;padding:0 10px;background:var(--surface);min-height:36px;flex-shrink:0;}
+:root[data-theme="dark"] .fb-date{background:var(--surface-2,#1e293b);}
+.fb-date .ico{width:14px;height:14px;color:var(--text-3);flex-shrink:0;}
+.fb-date input[type="date"]{border:0;outline:0;background:transparent;font-size:12px;color:var(--text);font-family:inherit;width:118px;}
+.fb-date .sep{color:var(--text-3);}
+/* ⭐ 다크모드 드롭다운 가독성 (어디에 있든 적용) */
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] select option{background:var(--surface-2,#1e293b);color:var(--text,#e2e8f0);}
+:root[data-theme="dark"] .filter-group{background:var(--surface-2,#1e293b);border-color:var(--border);}
+
+/* Tabs */
+.tabs{
+  display:flex;gap:4px;
+  border-bottom:1px solid var(--border);
+  margin-bottom:18px;
+  padding-bottom:0;
+}
+.tab{
+  padding:10px 14px 11px;
+  font-size:13.5px;font-weight:500;
+  color:var(--text-2);
+  display:flex;align-items:center;gap:6px;
+  border-bottom:2px solid transparent;
+  transition:color .12s,border-color .12s;
+  margin-bottom:-1px;
+}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
+.tab .badge{
+  background:var(--c-rose);color:#fff;
+  font-size:10.5px;font-weight:700;
+  width:18px;height:18px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+}
+.tab .ico{width:14px;height:14px;opacity:.85}
+
+/* Tab content */
+.tab-pane{display:none}
+.tab-pane.active{display:block;animation:fadeIn .25s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+/* ─────────────── Cards ─────────────── */
+.card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:16px 18px;
+  box-shadow:var(--shadow-sm);
+}
+.card-title{
+  font-size:13.5px;font-weight:700;color:var(--text);
+  display:flex;align-items:center;gap:6px;
+  margin-bottom:14px;
+}
+.card-title .ico{width:16px;height:16px}
+.card-title .right{margin-left:auto;font-size:12px;font-weight:500;color:var(--text-3)}
+
+/* KPI cards */
+.kpi-grid{
+  display:grid;
+  grid-template-columns:repeat(6,1fr);
+  gap:12px;
+  margin-bottom:14px;
+}
+.kpi{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:14px 16px;
+  display:flex;align-items:flex-start;gap:12px;
+  box-shadow:var(--shadow-sm);
+  transition:box-shadow .15s,transform .15s;
+}
+.kpi:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.kpi-icon{
+  width:38px;height:38px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.kpi-icon svg{width:18px;height:18px}
+.kpi-icon.blue{background:rgba(59,130,246,.1);color:var(--c-blue)}
+.kpi-icon.green{background:rgba(16,185,129,.1);color:var(--c-emerald)}
+.kpi-icon.amber{background:rgba(245,158,11,.1);color:var(--c-amber)}
+.kpi-icon.purple{background:rgba(168,85,247,.1);color:var(--c-purple)}
+.kpi-icon.cyan{background:rgba(6,182,212,.1);color:var(--c-cyan)}
+.kpi-icon.rose{background:rgba(244,63,94,.1);color:var(--c-rose)}
+.kpi-icon.slate{background:rgba(100,116,139,.1);color:var(--c-slate)}
+.kpi-body{flex:1;min-width:0}
+.kpi-label{font-size:12px;color:var(--text-3);margin-bottom:4px;font-weight:500}
+.kpi-value{
+  font-size:22px;font-weight:700;color:var(--text);
+  letter-spacing:-.02em;line-height:1.1;
+  display:flex;align-items:baseline;gap:2px;
+}
+.kpi-value .unit{font-size:13px;font-weight:600;color:var(--text-2);margin-left:2px}
+.kpi-foot{font-size:11.5px;color:var(--text-3);margin-top:6px;font-weight:500}
+.kpi-foot .up{color:var(--c-emerald)}
+.kpi-foot .down{color:var(--c-rose)}
+
+/* Two-column grid */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+
+/* Charts */
+.chart-wrap{position:relative;height:300px}
+.chart-wrap.tall{height:340px}
+.chart-wrap.short{height:240px}
+
+/* Donut center */
+.donut-wrap{position:relative}
+.donut-center{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  pointer-events:none;
+}
+.donut-center .v{font-size:22px;font-weight:700;color:var(--text);letter-spacing:-.02em}
+.donut-center .l{font-size:11.5px;color:var(--text-3);margin-top:2px}
+
+/* Distribution legend */
+.dist-legend{display:flex;flex-direction:column;gap:8px;padding:8px 0}
+.dist-row{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 0;
+  font-size:13px;
+}
+.dist-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.dist-name{color:var(--text-2);flex:1;font-weight:500}
+.dist-val{font-weight:700;color:var(--text);font-variant-numeric:tabular-nums}
+.dist-pct{color:var(--text-3);font-size:11.5px;margin-left:6px;min-width:32px;text-align:right}
+
+.dist-card{display:grid;grid-template-columns:240px 1fr;gap:8px;align-items:center}
+.dist-card .chart-wrap{height:240px}
+
+/* Table */
+.table-wrap{overflow-x:auto;margin:0 -2px}
+table.data{width:100%;border-collapse:collapse;font-size:13px}
+table.data th{
+  text-align:left;font-weight:600;color:var(--text-3);
+  font-size:12px;
+  padding:10px 12px;border-bottom:1px solid var(--border);
+  background:var(--th-bg,#f8fafc);
+  white-space:nowrap;
+}
+table.data td{
+  padding:11px 12px;
+  border-bottom:1px solid var(--border,#f1f5f9);
+  color:var(--text);
+  vertical-align:middle;
+}
+table.data tr:hover td{background:var(--hover-bg,#fafbfc)}
+:root[data-theme="dark"] table.data th{background:rgba(255,255,255,.04)}
+:root[data-theme="dark"] table.data tr:hover td{background:rgba(255,255,255,.06)}
+:root[data-theme="dark"] table.data th{background:var(--surface,#111827);border-bottom:1px solid var(--border)}
+:root[data-theme="dark"] table.data td{border-bottom:1px solid var(--border)}
+.tag{
+  display:inline-block;
+  padding:3px 9px;border-radius:9999px;
+  font-size:11.5px;font-weight:600;
+  white-space:nowrap;
+}
+.tag.done{background:#dbeafe;color:#1d4ed8}
+.tag.wait{background:#fef3c7;color:#b45309}
+.tag.delay{background:#fee2e2;color:#b91c1c}
+
+/* Pagination */
+.pagination{display:flex;justify-content:space-between;align-items:center;padding:14px 4px 4px;gap:12px;flex-wrap:wrap}
+.pagination .pg-info{font-size:12px;color:var(--text-3);font-weight:500}
+.pagination .pg-buttons{display:flex;align-items:center;gap:6px}
+.pg-btn{padding:6px 12px;font-size:12px;font-weight:600;color:var(--text-2);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;transition:all .15s}
+.pg-btn:hover:not(:disabled){background:var(--primary-soft);color:var(--primary-2);border-color:var(--primary)}
+.pg-btn:disabled{opacity:.4;cursor:not-allowed}
+.pg-cur{padding:0 10px;font-size:12px;font-weight:700;color:var(--text);min-width:60px;text-align:center}
+
+/* Heatmap */
+.heatmap{
+  display:grid;
+  grid-template-columns:auto repeat(4,1fr);
+  gap:4px;
+  font-size:11.5px;
+}
+.heatmap .h-head{color:var(--text-3);text-align:center;padding:2px 0;font-weight:600}
+.heatmap .h-row-label{color:var(--text-3);font-weight:600;display:flex;align-items:center;justify-content:center;padding:0 6px}
+.heatmap .h-cell{
+  aspect-ratio:1.6/1;
+  border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:12px;
+}
+
+/* Cost compare boxes */
+.cost-box{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:18px 20px;
+  text-align:center;
+  position:relative;
+}
+.cost-box .icon-line{
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  font-size:13px;color:var(--text-2);font-weight:600;
+  margin-bottom:8px;
+}
+.cost-box .v{
+  font-size:28px;font-weight:700;color:var(--text);
+  letter-spacing:-.02em;line-height:1.1;
+}
+.cost-box .v .unit{font-size:14px;font-weight:600;color:var(--text-2);margin-left:2px}
+.cost-box .sub{font-size:11.5px;color:var(--text-3);margin-top:6px}
+.cost-box.highlight{
+  background:#ecfdf5;
+  border:1.5px solid #6ee7b7;
+}
+.cost-box.highlight .v{color:#047857}
+.cost-box .pct-pill{
+  display:inline-block;margin-top:8px;
+  background:#6ee7b7;color:#065f46;
+  font-size:11.5px;font-weight:700;
+  padding:2px 8px;border-radius:9999px;
+}
+/* ⭐ 다크모드 highlight 카드 가시성 개선 */
+:root[data-theme="dark"] .cost-box.highlight{
+  background:rgba(16,185,129,.12);
+  border:1.5px solid rgba(16,185,129,.45);
+}
+:root[data-theme="dark"] .cost-box.highlight .v{color:#34d399}
+:root[data-theme="dark"] .cost-box .pct-pill{
+  background:rgba(16,185,129,.25);color:#6ee7b7;
+}
+
+/* Alert items */
+.alert-list{display:flex;flex-direction:column;gap:10px}
+.alert-item{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:14px 16px;
+  display:flex;align-items:flex-start;gap:12px;
+  position:relative;
+  border-left:4px solid var(--c-slate);
+}
+.alert-item.urgent{border-left-color:var(--c-rose)}
+.alert-item.warn{border-left-color:var(--c-amber)}
+.alert-item.info{border-left-color:var(--c-blue)}
+.alert-item.ok{border-left-color:var(--c-emerald)}
+.alert-icon{
+  width:32px;height:32px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;color:#fff;
+}
+.alert-item.urgent .alert-icon{background:var(--c-rose)}
+.alert-item.warn .alert-icon{background:var(--c-amber)}
+.alert-item.info .alert-icon{background:var(--c-blue)}
+.alert-item.ok .alert-icon{background:var(--c-emerald)}
+.alert-icon svg{width:16px;height:16px}
+.alert-body{flex:1;min-width:0}
+.alert-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:3px}
+.alert-msg{font-size:12.5px;color:var(--text-2);line-height:1.5}
+.alert-time{font-size:11.5px;color:var(--text-3);margin-top:6px;display:flex;align-items:center;gap:4px}
+.alert-tag{
+  position:absolute;top:12px;right:14px;
+  font-size:10.5px;font-weight:700;
+  padding:2px 8px;border-radius:9999px;
+}
+.alert-item.urgent .alert-tag{background:#fee2e2;color:#b91c1c}
+.alert-item.warn .alert-tag{background:#fef3c7;color:#b45309}
+.alert-item.info .alert-tag{background:#dbeafe;color:#1d4ed8}
+.alert-item.ok .alert-tag{background:#d1fae5;color:#047857}
+
+/* Engineer cards */
+.eng-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.eng-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:14px 16px;
+}
+.eng-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.eng-avatar{
+  width:36px;height:36px;border-radius:50%;
+  background:linear-gradient(135deg,#60a5fa,#3b82f6);
+  color:#fff;font-weight:700;font-size:14px;
+  display:flex;align-items:center;justify-content:center;
+  letter-spacing:-.02em;
+}
+.eng-name{font-size:14px;font-weight:700;color:var(--text)}
+.eng-role{font-size:11.5px;color:var(--text-3)}
+.eng-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;text-align:center}
+.eng-stats .s-l{font-size:10.5px;color:var(--text-3);font-weight:500}
+.eng-stats .s-v{font-size:14px;font-weight:700;color:var(--text);margin-top:2px}
+.eng-bar{height:6px;background:#f1f5f9;border-radius:9999px;overflow:hidden}
+.eng-bar-fill{height:100%;background:linear-gradient(90deg,#60a5fa,#3b82f6);border-radius:9999px;transition:width .4s}
+
+/* Mini bar */
+.mini-bar{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 0;
+}
+.mini-bar .lbl{font-size:12.5px;color:var(--text-2);width:90px;flex-shrink:0;font-weight:500}
+.mini-bar .track{flex:1;height:8px;background:#f1f5f9;border-radius:9999px;overflow:hidden}
+.mini-bar .fill{height:100%;border-radius:9999px;transition:width .4s}
+.mini-bar .v{font-size:12px;color:var(--text);font-weight:700;width:48px;text-align:right;font-variant-numeric:tabular-nums}
+
+/* Loading */
+.loading{
+  display:flex;align-items:center;justify-content:center;
+  padding:60px 20px;color:var(--text-3);font-size:13px;gap:8px;
+}
+.spinner{
+  width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--primary);
+  border-radius:50%;animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Toast */
+.toast{
+  position:fixed;bottom:20px;right:20px;
+  background:#0f172a;color:#fff;
+  padding:10px 16px;border-radius:8px;
+  font-size:13px;font-weight:500;
+  box-shadow:0 10px 30px rgba(0,0,0,.2);
+  z-index:1000;
+  opacity:0;transform:translateY(8px);transition:.25s;
+}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.error{background:#dc2626}
+
+/* Empty state */
+.empty{
+  text-align:center;padding:40px 20px;color:var(--text-3);
+  font-size:13px;
+}
+
+/* Top 5 list */
+.top-list{display:flex;flex-direction:column;gap:6px}
+.top-row{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 4px;border-bottom:1px solid #f1f5f9;
+}
+.top-row:last-child{border-bottom:0}
+.top-rank{
+  width:22px;height:22px;border-radius:6px;
+  background:#f1f5f9;color:var(--text-2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:11.5px;font-weight:700;
+}
+.top-row:nth-child(1) .top-rank{background:#fef3c7;color:#b45309}
+.top-row:nth-child(2) .top-rank{background:#e2e8f0;color:#475569}
+.top-row:nth-child(3) .top-rank{background:#fed7aa;color:#9a3412}
+.top-name{flex:1;font-size:13px;color:var(--text);font-weight:500}
+.top-val{font-size:12.5px;color:var(--text-3);font-variant-numeric:tabular-nums;font-weight:600}
+
+/* Responsive (compact) */
+@media (max-width:1280px){
+  .kpi-grid{grid-template-columns:repeat(3,1fr)}
+  .filter-group input[type="text"]{width:120px}
+}
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- ═════════════ Sidebar ═════════════ -->
+  <aside class="sidebar">
+    <div class="sb-logo">
+      <!-- ⭐ KICC v1.3c: 로고 벡터(SVG) 교체 — 어떤 배율에서도 선명 -->
+      <svg class="kicc-logo" xmlns="http://www.w3.org/2000/svg" viewBox="73 225 1254 246">
+<g transform="translate(0.000000,632.000000) scale(1.000000,-1.000000)" fill="#d31e30" stroke="none"><path d="M92 397 c-12 -5 -11 2 -11 -106 1 -90 1 -90 3 -97 6 -12 8 -14 17
+-19 11 -5 19 -6 52 -6 25 1 25 1 30 3 3 2 8 4 11 5 4 0 8 2 9 3 2 2 5 4 8 5 2
+1 7 4 12 7 4 4 10 8 13 10 3 2 11 9 17 15 14 14 48 49 68 69 16 16 63 63 85
+86 15 15 17 19 17 22 -1 5 -3 5 -52 5 l-46 0 -8 -7 c-12 -11 -49 -44 -50 -46
+-1 0 -6 -5 -12 -11 -7 -5 -13 -11 -14 -12 -2 -2 -6 -5 -8 -7 -3 -3 -7 -6 -8
+-8 -2 -1 -9 -7 -15 -13 -6 -6 -12 -11 -13 -12 -1 -1 -5 -4 -8 -7 -4 -4 -9 -8
+-10 -9 -2 -2 -4 -3 -5 -4 -1 -1 -3 -4 -5 -6 -2 -4 -3 -4 -6 -4 -6 0 -5 -1 -6
+69 0 63 0 63 -5 69 -7 8 -6 8 -31 8 -20 0 -23 0 -29 -2z"/>
+<path d="M497 397 c-2 -1 -6 -6 -9 -9 l-6 -7 0 -97 c1 -96 1 -96 5 -102 10
+-13 8 -13 42 -13 34 0 31 0 40 9 l6 7 0 98 c0 111 1 98 -9 110 -6 6 -6 6 -36
+6 -29 0 -30 0 -33 -2z"/>
+<path d="M662 398 c-22 -4 -33 -11 -41 -24 -4 -8 -4 -8 -4 -89 0 -75 0 -82 1
+-85 7 -14 11 -19 23 -25 13 -6 5 -6 156 -6 152 0 140 -1 146 7 4 5 5 30 2 38
+-4 10 7 9 -113 9 -70 0 -107 0 -109 1 -6 2 -11 7 -12 13 -1 3 -1 17 -2 44 0
+52 1 56 14 61 7 3 7 3 109 3 103 0 103 0 106 2 6 4 7 8 8 24 1 17 1 18 -6 25
+-3 3 -3 3 -140 3 -75 0 -137 0 -138 -1z"/>
+<path d="M1030 397 c-21 -4 -34 -15 -40 -31 -3 -9 -3 -9 -3 -82 0 -71 0 -74 2
+-77 1 -3 2 -5 2 -6 0 -4 3 -9 9 -16 6 -6 7 -7 17 -11 11 -4 11 -4 148 -5 135
+0 137 0 143 2 10 3 10 4 11 25 0 21 -1 24 -8 26 -2 1 -38 1 -109 1 -72 0 -106
+0 -108 1 -3 1 -8 6 -11 11 -2 5 -2 5 -2 48 0 49 -1 47 7 55 8 7 0 6 116 7 103
+0 105 1 108 3 5 3 7 8 7 26 0 17 -1 19 -6 22 -3 3 -3 3 -140 3 -115 0 -138 0
+-143 -2z"/></g>
+<g transform="translate(0.000000,632.000000) scale(1.000000,-1.000000)" fill="#e3871b" stroke="none"><path d="M335 262 c-13 -12 -40 -35 -43 -37 -2 -2 -3 -3 -4 -4 0 -1 3 -5 4 -5
+3 0 16 -11 33 -27 10 -10 19 -18 20 -18 1 -1 94 -1 96 0 5 1 -1 10 -14 22 -5
+4 -10 9 -12 11 -5 5 -37 32 -40 35 -5 3 -20 17 -24 22 -4 3 -9 7 -10 7 0 0 -3
+-3 -6 -6z"/></g>
+</svg>
+      <span class="sb-sub">폼즈 AS for KICC</span>
+    </div>
+    <nav class="sb-nav">
+      <button class="sb-item active" data-tab="dashboard">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 13h8V3H3v10Zm10 8h8V11h-8v10ZM3 21h8v-6H3v6Zm10-18v6h8V3h-8Z"/></svg>
+        <span>대시보드</span>
+      </button>
+      <button class="sb-item" data-tab="analysis">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+        <span>수리 분석</span>
+      </button>
+      <button class="sb-item" data-tab="shipping">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>
+        <span>출고 목록</span>
+      </button>
+      <button class="sb-item" data-tab="unrepair">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 21H3v-5"/><path d="M21 3 3 21"/><path d="M21 16v5h-5"/><path d="M3 8V3h5"/></svg>
+        <span>수리 불가</span>
+      </button>
+      <button class="sb-item" data-tab="t2n">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+        <span>불량 분석</span>
+      </button>
+      <button class="sb-item" data-tab="reentry">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        <span>재인입 추적</span>
+      </button>
+      <!-- ⭐ KICC판: 타 고객사 전용 탭(비용 비교·부품 현황)은 해당 없음 — 제거 -->
+      <button class="sb-item" data-tab="alerts">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        <span>알림 센터</span>
+        <span class="badge" id="sb-alert-badge">3</span>
+      </button>
+    </nav>
+    <div class="sb-foot">
+      <button class="sb-theme" id="theme-toggle">
+        <svg class="ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+        <span>라이트 모드</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ═════════════ Main ═════════════ -->
+  <main class="main">
+
+    <!-- Header -->
+    <header class="header">
+      <div>
+        <h1>KICC AS 현황 대시보드</h1>
+        <div class="subtitle">KICC 태블릿 AS 관리 시스템</div>
+      </div>
+      <div class="header-actions">
+        <div class="update-info">
+          <span class="dot"></span>
+          <span>최근 업데이트: <span id="last-update">—</span></span>
+        </div>
+        <button class="btn-export" id="btn-export">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          엑셀 내보내기
+        </button>
+      </div>
+    </header>
+
+    <!-- Filter bar -->
+    <div class="filter-bar onerow">
+      <!-- 기간 세그먼트 -->
+      <div class="seg">
+        <button class="seg-btn active" data-period="all">전체</button>
+        <button class="seg-btn" data-period="thisMonth">이번 달</button>
+        <button class="seg-btn" data-period="lastMonth">지난 달</button>
+      </div>
+      <!-- 날짜 직접 지정 -->
+      <div class="fb-date">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        <input type="date" id="f-date-from">
+        <span class="sep">~</span>
+        <input type="date" id="f-date-to">
+      </div>
+      <span class="fb-div"></span>
+      <!-- 출고연도 -->
+      <select id="f-year" class="fb-sel" title="출고연도"><option value="all">연도 전체</option></select>
+      <!-- 출고분기 칩 -->
+      <div class="cgroup" id="cg-quarter">
+        <button class="chip2 active" data-quarter="all">전체</button>
+        <button class="chip2" data-quarter="Q1">Q1</button>
+        <button class="chip2" data-quarter="Q2">Q2</button>
+        <button class="chip2" data-quarter="Q3">Q3</button>
+        <button class="chip2" data-quarter="Q4">Q4</button>
+      </div>
+      <span class="fb-div"></span>
+      <!-- 기종 칩 -->
+      <div class="cgroup" id="cg-model">
+        <button class="chip2 active" data-model="all">전체</button>
+        <button class="chip2" data-model="T2N">T2N</button>
+      </div>
+      <span class="fb-div"></span>
+      <!-- 수리유형 칩 -->
+      <div class="cgroup" id="cg-worktype">
+        <button class="chip2 active" data-worktype="all">전체</button>
+        <button class="chip2" data-worktype="single">단일</button>
+        <button class="chip2" data-worktype="multi">복합</button>
+      </div>
+      <!-- 시리얼 검색 (고정폭) -->
+      <div class="fb-search">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" id="f-serial" placeholder="시리얼 검색">
+      </div>
+      <!-- 조회 / 초기화 (한 묶음 — 줄바꿈 시에도 함께 이동) -->
+      <div class="fb-actions">
+        <button class="btn-search" id="btn-search">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          조회
+        </button>
+        <button class="btn-reset" id="btn-reset">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9"/><polyline points="3 4 3 9 8 9"/></svg>
+          초기화
+        </button>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" data-tab="dashboard">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 13h8V3H3v10Zm10 8h8V11h-8v10ZM3 21h8v-6H3v6Zm10-18v6h8V3h-8Z"/></svg>
+        대시보드
+      </button>
+      <button class="tab" data-tab="analysis">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+        수리 분석
+      </button>
+      <button class="tab" data-tab="shipping">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>
+        출고 목록
+      </button>
+      <button class="tab" data-tab="unrepair">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 21H3v-5"/><path d="M21 3 3 21"/><path d="M21 16v5h-5"/><path d="M3 8V3h5"/></svg>
+        수리 불가
+      </button>
+      <button class="tab" data-tab="t2n">📱 불량 분석</button>
+      <button class="tab" data-tab="reentry">🔁 재인입 추적</button>
+      <button class="tab" data-tab="alerts">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        알림 센터
+        <span class="badge" id="tab-alert-badge">3</span>
+      </button>
+    </div>
+
+    <!-- ─── Loading state ─── -->
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <span>데이터 불러오는 중...</span>
+    </div>
+
+    <!-- ════════ Tab: Dashboard ════════ -->
+    <div class="tab-pane active" id="pane-dashboard" hidden>
+      <!-- KPI Cards -->
+      <div class="kpi-grid" id="kpi-cards"></div>
+
+
+      <!-- Row 1: 도넛 + 월별 콤보 -->
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10H12V2Z" fill="currentColor"/></svg>
+            수리 항목 분포
+            <span class="right" id="dist-total">총 0건</span>
+          </div>
+          <div class="dist-card">
+            <div class="chart-wrap donut-wrap" style="height:240px">
+              <canvas id="chart-dist"></canvas>
+            </div>
+            <div class="dist-legend" id="dist-legend"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 14 4-4 4 4 5-5"/></svg>
+            월별 AS 비용 &amp; 건수 추이
+          </div>
+          <div class="chart-wrap"><canvas id="chart-monthly"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Row 2: 제조년월별 + 작업별 비용 -->
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            제조년월별 작업 추이
+          </div>
+          <div class="chart-wrap"><canvas id="chart-yymm"></canvas></div>
+        </div>
+
+        <!-- ⭐ KICC v1.3: 비용 구조 분석(공임/부품 도넛) 제거 → 작업별 비용 표로 대체
+             KICC 견적 체계: 작업별 부품·공임 포함 단가 (VAT 포함) — '견적 공임.xlsx' 당사 제안가 기준 -->
+        <div class="card">
+          <div class="card-title">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+            작업별 비용
+          </div>
+          <div style="font-size:10.5px;color:var(--text-3);margin:-2px 0 8px;">부품·공임 포함 · VAT 포함 단가 기준</div>
+          <div id="workcost-table"></div>
+        </div>
+      </div>
+
+      <!-- Row 3: 복잡도 + Top 5 -->
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            수리 복잡도 분석
+          </div>
+          <div id="complexity-bars" style="padding:8px 0"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 22h16L12 2Z"/><line x1="12" y1="9" x2="12" y2="14"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            고장 원인 Top 5
+          </div>
+          <div class="top-list" id="top-causes"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════ Tab: Analysis ════════ -->
+    <div class="tab-pane" id="pane-analysis" hidden>
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-title">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="9" y2="18"/></svg>
+          제조분기별 물량 분포
+        </div>
+        <div class="chart-wrap" style="height:240px"><canvas id="chart-quarter"></canvas></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+            수리유형별 AS 비용 비중
+          </div>
+          <div class="chart-wrap" style="height:280px"><canvas id="chart-worktype"></canvas></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            출고 요일별 히트맵
+          </div>
+          <div class="heatmap" id="heatmap-weekly"></div>
+        </div>
+      </div>
+
+
+    </div>
+
+    <!-- ════════ Tab: Shipping ════════ -->
+    <div class="tab-pane" id="pane-shipping" hidden>
+      <div class="grid-4" id="ship-kpi"></div>
+      <div class="card">
+        <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+          <span style="display:inline-flex;align-items:center;gap:8px;">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>
+            출고 목록
+          </span>
+          <!-- ⭐ v2.74: 페이지당 조회 건수 선택 (최대 '전체 보기') -->
+          <select id="ship-page-size" onchange="setShippingPageSize(this.value)" style="height:30px;padding:0 8px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-size:12.5px;">
+            <option value="20">20개씩 보기</option>
+            <option value="50">50개씩 보기</option>
+            <option value="100">100개씩 보기</option>
+            <option value="200">200개씩 보기</option>
+            <option value="all">전체 보기</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table class="data" id="ship-table">
+            <thead>
+              <tr>
+                <th style="width:40px">No</th>
+                <th>시리얼번호</th>
+                <th>기종</th>
+                <th>수리항목</th>
+                <th>출고일</th>
+                <th>처리일</th>
+                <th style="text-align:right">청구금액</th>
+                <th style="text-align:center;width:90px">외관 상태</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="ship-pagination" class="pagination"></div>
+      </div>
+
+    </div>
+
+    <!-- ════════ Tab: 수리 불가 (교품 처리) ════════ -->
+    <div class="tab-pane" id="pane-reentry" hidden>
+      <div class="kpi-grid" id="reentry-kpis" style="margin-bottom:16px;"></div>
+      <div class="card">
+        <div class="card-title">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          재인입(재전달) 기기 추적
+          <span class="right" id="reentry-count" style="font-weight:700;">—</span>
+        </div>
+        <div style="padding:0 16px 4px;font-size:11.5px;color:var(--text-3);line-height:1.6;">
+          💡 출고 후 다시 전달된 기기를 <b>시리얼별로 묶어</b> 회차·사유와 함께 추적합니다 —
+          <b style="color:#ef4444;">증상 재발</b>(볼타레스 수리 이슈) · <b style="color:#8b5cf6;">타 불량 발생</b>(기존 수리와 다른 새 증상) · <b style="color:#d97706;">매장/고객 과실</b>(파손 등) · <b style="color:#2563eb;">단순 작업 요청</b>(펌웨어/점검 등)
+        </div>
+        <div id="reentry-body" style="padding:8px 16px 16px;"></div>
+      </div>
+    </div>
+
+    <div class="tab-pane" id="pane-unrepair" hidden>
+      <div class="card">
+        <div class="card-title">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 21H3v-5"/><path d="M21 3 3 21"/><path d="M21 16v5h-5"/><path d="M3 8V3h5"/></svg>
+          수리 불가 처리
+          <span class="right" id="exchange-count" style="font-weight:700;">—</span>
+        </div>
+        <div style="padding:0 16px 4px;font-size:11.5px;color:var(--text-3);line-height:1.6;">
+          💡 AS 비용이 <b>새 제품 구매가를 초과</b>하는 것으로 판정되는 경우 <b>수리 불가</b>로 처리됩니다. 아래는 수리 불가 처리된 기기 목록입니다.
+        </div>
+        <div id="exchange-model-filter" style="padding:8px 16px 0;display:flex;gap:6px;flex-wrap:wrap;"></div>
+        <div class="table-wrap">
+          <table class="data" id="exchange-table">
+            <thead><tr><th style="width:40px">No</th><th>시리얼번호</th><th>기종</th><th>사유</th><th>점검일</th></tr></thead>
+            <tbody id="exchange-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ⭐ KICC v1.3a: 비용비교(태클라스트 단가)·부품현황 탭의 잔여 코드 완전 제거 — 고객사 파일에 타 단가 정보 미노출 -->
+    <!-- ════════ Tab: Alerts ════════ -->
+    <!-- ════════ Tab: T2N 품질 (v2.75h — 대시보드 카드에서 정식 탭으로 승격) ════════ -->
+    <div class="tab-pane" id="pane-t2n" hidden>
+      <div class="card" id="t2n-quality-card" style="margin-bottom:16px;">
+        <div class="card-title">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18.01"/></svg>
+          T2N 불량 분석
+          <span class="right" id="t2n-q-total"></span>
+        </div>
+        <div id="t2n-quality-body"></div>
+      </div>
+    </div>
+
+    <div class="tab-pane" id="pane-alerts" hidden>
+      <div class="filter-bar" style="margin-bottom:14px">
+        <button class="chip active" data-alert="all">전체</button>
+        <button class="chip" data-alert="urgent">긴급</button>
+        <button class="chip" data-alert="warn">경고</button>
+        <button class="chip" data-alert="info">정보</button>
+      </div>
+      <div class="alert-list" id="alert-list"></div>
+    </div>
+
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+ *  CONFIG  
+ *  ── 토리님: 아래 APPS_SCRIPT_URL 을 본인의 Web App URL 로 교체하세요.
+ *     예: 'https://script.google.com/macros/s/AKfy...../exec'
+ *  ── DEMO_MODE = true 로 두면 오프라인 mock 데이터로 동작합니다.
+ * ═════════════════════════════════════════════════════════════ */
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby4q1TNBU87K2LBDJAGrpBNlwBn4wsBIxDZKCUq_wdTnheLULUuQXipq8QNyDV2e7xyZw/exec';   // ⭐ v2.72b: 고객사 GAS 배포 불안정(익명 load 404) → 검증된 사내 GAS 배포로 통합 (client=1 경로가 민감정보 제거)
+// ⭐ KICC판: 실데이터 채널(client_kicc.json) 연동 전까지 예시 데이터로 시연.
+//   연동 준비가 되면 KICC_DEMO 를 false 로만 바꾸면 즉시 실데이터로 전환됩니다.
+const KICC_DEMO = true;
+const DEMO_MODE = KICC_DEMO || APPS_SCRIPT_URL.startsWith('__');
+
+/* 새제품 단가 */
+const NEW_UNIT_PRICE = 140000;
+/* 미출고 알림 기준 (등록 후 N일 이상 미출고시 알림) */
+const STALE_DAYS = 14;
+
+/* ═══════════════════════════════════════════════════════════════
+ *  STATE
+ * ═════════════════════════════════════════════════════════════ */
+const state = {
+  raw: null,        // 원본 데이터
+  filtered: [],     // 필터링된 entries
+  filteredShip: [], // 필터링된 출고이력
+  filter: {
+    period: 'all',
+    quarter: 'all',
+    year: 'all',
+    dateFrom: '',
+    dateTo: '',
+    model: 'all',
+    yymm: 'all',
+    worktype: 'all',
+    serial: '',
+  },
+  charts: {},       // Chart.js 인스턴스
+  alerts: [],
+  alertFilter: 'all',
+  shippingPage: 1,
+  shippingPageSize: 20,
+};
+
+/* ═══════════════════════════════════════════════════════════════
+ *  UTILS
+ * ═════════════════════════════════════════════════════════════ */
+const fmt = {
+  num: n => Number(n||0).toLocaleString('ko-KR'),
+  won: n => Number(n||0).toLocaleString('ko-KR') + '원',
+  pct: (n, total) => total > 0 ? ((n/total)*100).toFixed(1)+'%' : '0%',
+  date: d => {
+    if(!d) return '-';
+    try {
+      const dt = new Date(d);
+      if(isNaN(dt)) return String(d).slice(0,10);
+      return dt.toISOString().slice(0,10);
+    } catch { return '-'; }
+  },
+  ym: d => {
+    try {
+      const dt = new Date(d);
+      return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`;
+    } catch { return ''; }
+  },
+};
+
+/* 시리얼번호에서 제조년월 추출 (TO + YYMM 패턴) */
+function extractYYMM(serial) {
+  if(!serial) return null;
+  const s = String(serial).toUpperCase();
+  if(!s.startsWith('T')) return null;
+  // T + 4자리 YYMM 형태 가정 (예: T2410xxxx → 24년 10월)
+  const m = s.match(/^T\w?(\d{4})/);
+  if(!m) return null;
+  const yy = m[1].slice(0,2);
+  const mm = m[1].slice(2,4);
+  if(parseInt(mm) < 1 || parseInt(mm) > 12) return null;
+  return `20${yy}-${mm}`;
+}
+
+/* 분기 추출 */
+function getQuarter(d) {
+  try {
+    const dt = new Date(d);
+    return 'Q' + (Math.floor(dt.getMonth()/3) + 1);
+  } catch { return ''; }
+}
+
+/* 요일·주차 (한 달 내 1~4주차) */
+function getWeekday(d) { return new Date(d).getDay(); } // 0=일 ~ 6=토
+function getWeekOfMonth(d) {
+  const dt = new Date(d);
+  return Math.min(4, Math.ceil(dt.getDate()/7));
+}
+
+/* 부품비 계산 — 두 함수로 분리
+   - partsValue(entry):  실제 부품 가치 (절감액·비교 산정용)
+   - partsBilled(entry): 청구 대상 부품비 (현재 정책 0원, 미래 자비분만)
+   정책: 모든 부품 = 고객사 사전 지급분 → partsBilled = 0
+   미래 자비 구매 시: 재고 시트 'source' 필드 기반 FIFO 분리 활성화 */
+/* ⭐ 기종명 정규화 — 언더스코어/공백/하이픈/대소문자 차이 무시
+   "S2PRO_N" / "S2PRON" / "s2pro n" → 모두 "S2PRON" 으로 통일 매칭 */
+function normalizeModel(m) {
+  return String(m || '').trim().toUpperCase().replace(/[_\s\-]/g, '');
+}
+
+/* modelParts를 정규화된 키로 변환 (한 번 만들어 캐시) */
+function getNormalizedModelParts() {
+  const ps = (state.raw && state.raw.priceSettings) || {};
+  const mp = ps.modelParts || {};
+  // raw 객체가 바뀌면 다시 생성
+  if(window._nmpCache && window._nmpCacheRef === mp) return window._nmpCache;
+  const result = {};
+  for(const [model, parts] of Object.entries(mp)) {
+    result[normalizeModel(model)] = parts;
+  }
+  window._nmpCache = result;
+  window._nmpCacheRef = mp;
+  return result;
+}
+
+function partsValue(entry) {
+  if(!entry) return 0;
+  const nmp = getNormalizedModelParts();
+  const modelPrice = nmp[normalizeModel(entry.model)];
+  if(!modelPrice) return 0;
+  const works = entry.works || [];
+  const base = works.reduce((sum, w) => sum + (Number(modelPrice[w === 'nonbat_full' ? 'nonbat' : w]) || 0), 0);
+  // ⭐ v2.75i: 공통(1건 1회) 부품비 — 필름류처럼 작업과 무관하게 1건당 1회 (복합 수리 이중 계산 방지)
+  return base + (works.length ? (Number(modelPrice._common) || 0) : 0);
+}
+function partsBilled(entry) {
+  return 0;
+}
+function partsCost(entry) { return partsBilled(entry); }
+
+/* 수리항목 한글 이름 매핑 */
+const WORK_KO = {
+  // ⭐ v2.75e: nonbat = 예나 지금이나 '논배터리(백커버 포함)' — 과거 데이터와 표기 일관.
+  //   2026-09 단가 개편으로 신설된 '백커버 미포함(커버 재사용)'만 새 키 nonbat_nc.
+  // ⭐ KICC v1.3a: 작업명을 KICC 견적서('견적 공임.xlsx') 명칭으로 전면 통일
+  pcb:'PCB 교체', panel:'일체형 액정 패널 교체', board:'충전단자 수리', nonbat:'논배터리',
+  nonbat_nc:'파워보드 교체', nonbat_full:'논배터리',   // 견적 외 항목은 기존 명칭 유지
+  battery:'배터리 교체', lcd:'일체형 액정 패널 교체', mb:'충전단자 수리',
+  cover:'백커버 교체', etc:'기타 보정'
+};
+function workName(k) { return WORK_KO[k] || k; }
+
+/* ═══════════════════════════════════════════════════════════════
+ *  ⭐ KICC v1.3: KICC 견적 체계 ('견적 공임.xlsx' 당사 제안가)
+ *  - 작업별 "부품·공임 포함" 단가로 청구 (VAT 포함)
+ *  - 기본 작업비: 세척 3,000 + S/W 설치 2,000 = 건당 5,000 (전 건 공통)
+ *  - 검수 3,000은 청구 조건 별도 설정 → 기본 미포함 (포함 시 KICC_INSPECT_FEE 참조)
+ * ═════════════════════════════════════════════════════════════ */
+const KICC_PRICES = { pcb:68000, panel:60000, lcd:60000, board:20000, mb:20000, cover:12000, etc:0 };
+const KICC_WORK_KO = { pcb:'PCB 교체', panel:'일체형 액정 패널 교체', lcd:'일체형 액정 패널 교체', board:'충전단자 수리', mb:'충전단자 수리', cover:'백커버 교체', etc:'기타 보정 (무상)' };
+const KICC_BASE_FEE = 5000;      // 기본 작업비(건당): 세척 + S/W 설치
+const KICC_INSPECT_FEE = 3000;   // 검수 (청구 조건 별도 — 현재 미포함)
+function kiccWorkName(k){ return KICC_WORK_KO[k] || workName(k); }
+function kiccWorkCost(e){ return (e.works||[]).reduce((s,w)=> s + (Number(KICC_PRICES[w])||0), 0); }
+// ⭐ KICC v1.3c: 무상/유상 구분 — 유상 작업(단가>0)이 하나도 없는 건(기타 보정만 등)은 무상 수리로 청구 제외
+function kiccPaid(e){ return kiccWorkCost(e) > 0; }
+function kiccTotal(e){ const c = kiccWorkCost(e); return c > 0 ? c + KICC_BASE_FEE : 0; }
+// ⭐ v2.75o: 과거 출고 로그에 문자열로 저장된 구 명칭 표기 교정
+function fixWorkStr(x) { return String(x || '').replace(/논배터리\(커버X\)/g, '파워보드').replace(/논배\(미포함\)/g, '파워보드').replace(/논배터리\(백커버 미포함\)/g, '파워보드 교체')
+  // ⭐ KICC v1.3a: 서버(사내전산) 작업명 → KICC 견적서 명칭으로 교정 (실데이터 연동 대비)
+  .replace(/LCD 교체/g, '일체형 액정 패널 교체').replace(/MB수리/g, '충전단자 수리').replace(/기타작업/g, '기타 보정'); }
+
+/* Toast */
+function toast(msg, kind='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + (kind||'');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ *  DATA LOADING
+ * ═════════════════════════════════════════════════════════════ */
+async function loadData() {
+  if(DEMO_MODE) {
+    return generateDemoData();
+  }
+  // ⭐ v2.73: GitHub CDN 채널 1순위 — 서버가 5분마다 발행해둔 client.json(민감정보 제거본)을
+  //   CDN에서 즉시 읽음(~1초). 신선도 20분 초과·실패 시 GAS 압축 fetch → JSONP 순 폴백.
+  let resp = null;
+  if(typeof fetch === 'function' && typeof DecompressionStream === 'function') {
+    try { resp = await loadViaGitHub(); } catch(e) { resp = null; }
+    if(!resp) { try { resp = await loadViaFetchZ(); } catch(e) { resp = null; } }
+  }
+  if(!resp) resp = await loadJSONP();
+  if(!resp || resp.ok !== true) {
+    throw new Error(resp && resp.error ? resp.error : '서버 응답이 비정상입니다');
+  }
+  return resp.data;
+}
+
+// ⭐ v2.73: GitHub 데이터 채널 — 사내전산과 같은 구조. 2분 버킷 캐시 + 429 시 10분 쿨다운.
+const GH_DATA_BASE = 'https://raw.githubusercontent.com/tori-forms/forms-as/data/data';
+// ⭐ KICC판: 서버(Code.gs)가 거래처별로 갈라 발행하는 KICC 전용 채널만 읽는다 — 타 고객사 데이터 접근 불가
+const CLIENT_DATA_FILE = '/client_kicc.json';
+const GH_FRESH_MS = 20 * 60 * 1000;   // 발행 20분 초과분은 낡은 것으로 보고 GAS 폴백
+async function loadViaGitHub() {
+  if(window._ghSkipUntil && Date.now() < window._ghSkipUntil) throw new Error('gh cooldown');
+  const bucket = Math.floor(Date.now() / 120000);
+  const res = await fetch(GH_DATA_BASE + CLIENT_DATA_FILE + '?t=' + bucket);
+  if(!res.ok) {
+    if(res.status === 429) window._ghSkipUntil = Date.now() + 600000;
+    throw new Error('gh http ' + res.status);
+  }
+  const obj = await res.json();
+  if(!obj || !obj._z) throw new Error('gh format');
+  if(obj.t && (Date.now() - Number(obj.t)) > GH_FRESH_MS) throw new Error('gh stale');
+  const bytes = Uint8Array.from(atob(obj._z), c => c.charCodeAt(0));
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  const jsonTxt = await new Response(stream).text();
+  const parsed = JSON.parse(jsonTxt);
+  if(!parsed || parsed.ok !== true) throw new Error('gh payload');
+  return parsed;
+}
+
+async function loadViaFetchZ() {
+  const r = await fetch(APPS_SCRIPT_URL + '?action=load&client=1&fmt=2', { method:'GET', redirect:'follow' });
+  const txt = await r.text();
+  const obj = JSON.parse(txt);
+  if(obj && obj._z) {
+    const bytes = Uint8Array.from(atob(obj._z), c => c.charCodeAt(0));
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+    const jsonTxt = await new Response(stream).text();
+    return JSON.parse(jsonTxt);
+  }
+  return obj;
+}
+
+function loadJSONP() {
+  return new Promise((resolve, reject) => {
+    const cb = '__cb_' + Date.now() + '_' + Math.floor(Math.random()*1000);
+    let timer;
+    const cleanup = () => {
+      delete window[cb];
+      if(s.parentNode) s.parentNode.removeChild(s);
+      if(timer) clearTimeout(timer);
+    };
+    window[cb] = (data) => { cleanup(); resolve(data); };
+    const s = document.createElement('script');
+    s.src = APPS_SCRIPT_URL + '?action=load&client=1&callback=' + cb;
+    s.onerror = () => { cleanup(); reject(new Error('스크립트 로드 실패 — Apps Script URL 확인 필요')); };
+    document.head.appendChild(s);
+    // 60초 타임아웃 (GAS 콜드스타트 방어)
+    timer = setTimeout(() => { cleanup(); reject(new Error('서버 응답 타임아웃 (60초)')); }, 60000);
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ *  DEMO DATA (토리님이 보여주신 시안 수치와 일치하도록 생성)
+ *  실제 운영 시에는 APPS_SCRIPT_URL 을 설정하면 자동으로 실데이터 사용
+ * ═════════════════════════════════════════════════════════════ */
+function generateDemoData() {
+  // ⭐ KICC 시연용 예시 데이터 — 실제 물량이 아닌 무작위 생성 데이터 (화면 곳곳에 '예시 데이터' 표기)
+  const workers = ['김기사', '이기사', '박기사', '최기사'];
+  const entries = [], shipLog = [], exchange = [];
+  let id = 1000;
+  const rnd = n => Math.floor(Math.random() * n);
+  const pad = (n, w) => String(n).padStart(w, '0');
+  // 최근 10주, 주중 하루 8~16건 접수
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const start = new Date(today); start.setDate(start.getDate() - 70);
+  for(let d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
+    const dow = d.getDay(); if(dow === 0 || dow === 6) continue;
+    const cnt = 8 + rnd(9);
+    for(let i = 0; i < cnt; i++) {
+      const serial = 'TN25' + pad(1 + rnd(12), 2) + 'TT' + pad(rnd(99999), 5);
+      // ⭐ KICC v1.3: 작업 구성 — KICC 견적 항목 기준 (LCD 위주 + PCB·충전단자·백커버)
+      const works = [];
+      const r = Math.random();
+      if(r < 0.45) works.push('panel');
+      else if(r < 0.65) works.push('pcb');
+      else if(r < 0.74) { works.push('panel'); works.push('pcb'); }
+      else if(r < 0.84) works.push('board');       // 충전단자 수리
+      else if(r < 0.93) works.push('cover');       // 백커버 교체
+      if(Math.random() < 0.6) works.push('etc');   // 기타 보정 (무상)
+      if(!works.length) works.push('etc');
+      // 청구액 = 작업별 부품·공임 포함 단가 + 기본 작업비(세척+S/W) · 무상건(유상 작업 없음)은 0원
+      const _wc = works.reduce((sm, k) => sm + (Number(KICC_PRICES[k]) || 0), 0);
+      const total = _wc > 0 ? _wc + KICC_BASE_FEE : 0;
+      const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1, 2)}-${pad(d.getDate(), 2)}`;
+      // 불량 재현 태그 (불량 분석 시연용): 재현 62% / 미재현 26% / 미기재 12%
+      const q = Math.random();
+      const note = q < 0.62 ? '[불량재현O] ' : q < 0.88 ? '[불량재현X] ' : '';
+      // 재인입 약 3%
+      const reentry = Math.random() < 0.03
+        ? JSON.stringify({ v: 2, rs: ['defect', 'other', 'fault', 'etc'][rnd(4)], prev: '', memo: '' }) : '';
+      const shipped = Math.random() < 0.86;
+      const e = { id: 'D' + (id++), worker: workers[rnd(workers.length)], serial, works, total,
+        date: dateStr + 'T0' + (1 + rnd(8)) + ':00:00', note, model: 'T2N',
+        parts: '{}', status: shipped ? 'shipped' : 'aging', reentry };
+      entries.push(e);
+      if(shipped) {
+        const sd = new Date(d); sd.setDate(sd.getDate() + 2 + rnd(3));
+        if(sd <= today) shipLog.push({ serial, shipDate: `${sd.getFullYear()}-${pad(sd.getMonth() + 1, 2)}-${pad(sd.getDate(), 2)}`,
+          worker: e.worker, model: 'T2N', works: works.map(k => (typeof workName === 'function' ? workName(k) : k)).join(' / '), fee: total });
+      }
+      // 수리 불가(비용 초과) 약 1.2%
+      if(Math.random() < 0.012) {
+        exchange.push({ id: 'X' + id, worker: e.worker, serial: 'TN25' + pad(1 + rnd(12), 2) + 'TT' + pad(rnd(99999), 5),
+          model: 'T2N', reason: 'cost', note: '', works: JSON.stringify(['pcb', 'panel']),
+          estimatedCost: 128000 + rnd(20000), date: dateStr + 'T05:00:00' });   // ⭐ v1.3: PCB+패널 KICC 단가 기준
+      }
+    }
+  }
+  return {
+    entries,
+    workers,
+    kpiMap: {},
+    stock: [],
+    stockLog: [],
+    docs: [],
+    shipLog,
+    exchange,
+    priceSettings: {},
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ *  FILTER
+ * ═════════════════════════════════════════════════════════════ */
+/* ⭐ 출고연도 드롭다운 옵션 채우기 (출고이력 기준) */
+function populateYearOptions() {
+  const sel = document.getElementById('f-year');
+  if(!sel) return;
+  const shipLog = (state.raw && state.raw.shipLog) || [];
+  const years = new Set();
+  shipLog.forEach(s => {
+    if(!s.shipDate) return;
+    const d = new Date(s.shipDate);
+    if(!isNaN(d.getTime())) years.add(d.getFullYear());
+  });
+  const sorted = Array.from(years).sort((a,b) => b - a); // 최신 연도 먼저
+  sel.innerHTML = '<option value="all">연도 전체</option>' +
+    sorted.map(y => `<option value="${y}">${y}년</option>`).join('');
+  sel.value = state.filter.year || 'all';
+}
+
+function applyFilter() {
+  const f = state.filter;
+  const all = state.raw.entries || [];
+  const shipLog = state.raw.shipLog || [];
+
+  // ⭐ v2.72: 재인입(같은 시리얼 2차 수리) 대응 — 수리건마다 '등록일 이후 첫 출고일'을 짝지음.
+  //   기존 Map은 시리얼당 마지막 출고일 하나만 남아, 재작업 제품이 재출고되면
+  //   과거에 출고했던 1차 건까지 최신 출고월로 끌려가 월별 건수·금액이 소급 변동했음.
+  //   (월초 엑셀 내보내기와 월말 수치가 달라지던 원인)
+  const _dayKeyF = (v) => { const d = new Date(v); return isNaN(d) ? '' : d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+  const _shipsBySerialF = new Map();
+  shipLog.forEach(s => {
+    if(!s.serial || !s.shipDate) return;
+    if(!_shipsBySerialF.has(s.serial)) _shipsBySerialF.set(s.serial, []);
+    _shipsBySerialF.get(s.serial).push(s);
+  });
+  _shipsBySerialF.forEach(l => l.sort((a,b) => _dayKeyF(a.shipDate).localeCompare(_dayKeyF(b.shipDate))));
+  const _entryCntBySerial = new Map();
+  all.forEach(e => { if(e.serial) _entryCntBySerial.set(e.serial, (_entryCntBySerial.get(e.serial) || 0) + 1); });
+  const shipDateForEntry = (e) => {
+    const l = _shipsBySerialF.get(e.serial);
+    if(!l || !l.length) return undefined;
+    const ek = _dayKeyF(e.date);
+    if(ek) {
+      for(let i = 0; i < l.length; i++) { const sk = _dayKeyF(l[i].shipDate); if(sk && sk >= ek) return l[i].shipDate; }
+    }
+    // 등록일 이후 출고 기록이 없는 경우:
+    //  - 이 시리얼의 수리 기록이 1건뿐이면 재인입이 아님 → 날짜 표기 이상 관용으로 마지막 출고일 사용(기존 동작 유지)
+    //  - 수리 기록이 여러 건(재인입)이면 이 건은 아직 재출고 전 → 미출고(출고대기)로 분류
+    if((_entryCntBySerial.get(e.serial) || 0) <= 1) return l[l.length - 1].shipDate;
+    return undefined;
+  };
+
+  let from = f.dateFrom ? new Date(f.dateFrom) : null;
+  let to = f.dateTo ? new Date(f.dateTo + 'T23:59:59') : null;
+
+  // period preset (이번 달/지난 달은 출고일 기준)
+  // Q1~Q4는 제조년월(시리얼) 기준이라 from/to 안 씀, 별도 처리
+  if(f.period !== 'all' && !f.dateFrom) {
+    const now = new Date();
+    if(f.period === 'thisMonth') {
+      from = new Date(now.getFullYear(), now.getMonth(), 1);
+      to = now;
+    } else if(f.period === 'lastMonth') {
+      from = new Date(now.getFullYear(), now.getMonth()-1, 1);
+      to = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+    }
+  }
+
+  // ⭐ 분기(Q1~Q4) + 연도 필터 — 출고일(shipDate) 기준
+  const QUARTER_RANGES = {Q1:[1,3], Q2:[4,6], Q3:[7,9], Q4:[10,12]};
+  const isQuarter = ['Q1','Q2','Q3','Q4'].includes(f.quarter);
+  const hasYear = f.year && f.year !== 'all';
+  const checkQuarter = (shipDate) => {
+    if(!isQuarter && !hasYear) return true;
+    if(!shipDate) return false;
+    const d = new Date(shipDate);
+    if(isNaN(d.getTime())) return false;
+    if(hasYear && d.getFullYear() !== Number(f.year)) return false;
+    if(isQuarter) {
+      const m = d.getMonth() + 1;
+      const [start, end] = QUARTER_RANGES[f.quarter];
+      if(m < start || m > end) return false;
+    }
+    return true;
+  };
+
+  // 출고일 기준 1차 필터링 (yymm 제외 - 드롭다운 옵션 추출용)
+  const baseFiltered = all
+    .map(e => ({...e, shipDate: shipDateForEntry(e)}))
+    .filter(e => {
+      // 출고된 것만
+      if(!e.shipDate) return false;
+      // 분기/연도 필터 (출고일 기준)
+      if(!checkQuarter(e.shipDate)) return false;
+      // 출고일 기간 필터
+      if(from || to) {
+        const d = new Date(e.shipDate);
+        if(from && d < from) return false;
+        if(to && d > to) return false;
+      }
+      if(f.model !== 'all' && normalizeModel(e.model) !== normalizeModel(f.model)) return false;
+      if(f.worktype !== 'all') {
+        const wlen = (e.works||[]).length;
+        if(f.worktype === 'single' && wlen > 1) return false;
+        if(f.worktype === 'multi' && wlen <= 1) return false;
+      }
+      if(f.serial && !String(e.serial).toLowerCase().includes(f.serial.toLowerCase())) return false;
+      return true;
+    });
+
+  // 1차 필터링 결과에서 yymm 옵션 추출 (드롭다운 동적 갱신용)
+  const yymmSet = new Set();
+  baseFiltered.forEach(e => {
+    const y = extractYYMM(e.serial);
+    if(y) yymmSet.add(y);
+  });
+  state.yymmOptions = Array.from(yymmSet).sort().reverse();
+
+  // 2차 필터링 (yymm 적용)
+  state.filtered = (f.yymm === 'all')
+    ? baseFiltered
+    : baseFiltered.filter(e => extractYYMM(e.serial) === f.yymm);
+
+  // 출고이력 필터링 (모델 + 시리얼 + 날짜 + 분기)
+  state.filteredShip = shipLog.filter(s => {
+    // 분기/연도 필터 (출고일 기준)
+    if(!checkQuarter(s.shipDate)) return false;
+    // 날짜 필터 (출고일자 기준)
+    if(from || to) {
+      if(!s.shipDate) return false; // 출고일 없으면 제외
+      const d = new Date(s.shipDate);
+      if(from && d < from) return false;
+      if(to && d > to) return false;
+    }
+    if(f.model !== 'all' && normalizeModel(s.model) !== normalizeModel(f.model)) return false;
+    if(f.serial && !String(s.serial).toLowerCase().includes(f.serial.toLowerCase())) return false;
+    return true;
+  });
+  // 최신 출고일 순으로 정렬 (내림차순)
+  state.filteredShip.sort((a, b) => {
+    const da = String(a.shipDate || '');
+    const db = String(b.shipDate || '');
+    return db.localeCompare(da);
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ *  RENDER: KPI
+ * ═════════════════════════════════════════════════════════════ */
+function renderKPI() {
+  const data = state.filtered;
+  const total = data.length;
+  // ⭐ KICC v1.3: 청구액 = 작업별 부품·공임 포함 단가 + 기본 작업비
+  const sumValue = data.reduce((s,e) => s + kiccTotal(e), 0);
+  const sumBilled = sumValue;
+  // ⭐ KICC v1.3c: 무상/유상 취합 — 평균은 유상 건 기준 (무상 포함 시 평균 왜곡)
+  const paidCnt = data.filter(kiccPaid).length;
+  const freeCnt = total - paidCnt;
+  const avgBilled = paidCnt ? sumBilled/paidCnt : 0;
+  const multi = data.filter(e => (e.works||[]).length >= 2).length;
+  const multiPct = total ? (multi/total*100) : 0;
+
+  // 평균 처리 리드타임: 출고이력에서 계산 (출고일 - 등록일)
+  const shipLog = state.raw.shipLog || [];
+  const shipMap = new Map(shipLog.map(s => [s.serial, s.shipDate]));
+  const leadTimes = data
+    .map(e => {
+      const sd = shipMap.get(e.serial);
+      if(!sd) return null;
+      const days = (new Date(sd) - new Date(e.date)) / (1000*60*60*24);
+      return days >= 0 ? days : null;
+    })
+    .filter(x => x !== null);
+  const avgLead = leadTimes.length ? leadTimes.reduce((a,b)=>a+b,0)/leadTimes.length : 0;
+
+  // ⭐ 재발 수리율 개편 — 재인입(재전달) 정식 데이터 기반:
+  //   분자 = 재인입 건 중 '볼타레스 수리 이슈(재발, rs=defect)'만  ·  분모 = 출고 완료 건수
+  //   매장 과실(store)·단순 작업(task)은 재발률에서 제외하고 별도 집계 (foot에 표기)
+  const _parseRe = (e) => { try { const r = JSON.parse(e.reentry || ''); return (r && r.v >= 2) ? r : null; } catch(_) { return null; } };
+  const reentries = data.map(_parseRe).filter(Boolean);
+  const _reCnt = { defect:0, store:0, task:0, etc:0 };
+  reentries.forEach(r => { _reCnt[r.rs] = (_reCnt[r.rs] || 0) + 1; });
+  const shippedCnt = data.filter(e => String(e.status) === 'shipped').length;
+  const repeats = reentries.length;   // 재입고(재인입) 총 건수
+  const repeatPct = shippedCnt ? (_reCnt.defect / shippedCnt * 100) : 0;
+
+  // ⭐ KICC v1.3b: KPI 각주를 KICC 청구 구조 기준으로 정리 (타 고객사 청구 방식 문구 제거)
+  const kpis = [
+    {label:'총 작업 수량', val:fmt.num(total), unit:'건', color:'slate', icon:'wrench', foot:`출고 완료 ${fmt.num(shippedCnt)} · 처리 중 ${fmt.num(total - shippedCnt)}`},
+    {label:'폼즈 AS 청구액', val:fmt.num(sumBilled), unit:'원', color:'green', icon:'won', foot:`유상 ${fmt.num(paidCnt)}건 · 무상 ${fmt.num(freeCnt)}건 · VAT 포함`},
+    {label:'건당 평균 청구액', val:fmt.num(Math.round(avgBilled)), unit:'원', color:'amber', icon:'calc', foot:'청구액 ÷ 유상 수리 건수'},
+    {label:'복합수리 비율', val:multiPct.toFixed(0), unit:'%', color:'purple', icon:'layers', foot:`${multi}건 / ${total}건`},
+    {label:'평균 처리 리드타임', val:avgLead.toFixed(1), unit:'일', color:'cyan', icon:'clock', foot:'수리등록 ~ 출고 소요일'},
+    {label:'재발 수리율', val:repeatPct.toFixed(1), unit:'%', color:'rose', icon:'refresh', foot:`재입고 ${repeats}건 · 상세는 재인입 추적 탭`},
+  ];
+
+  const ICONS = {
+    wrench: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+    won:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><text x="3" y="18" font-size="18" font-weight="900" fill="currentColor" stroke="none">₩</text></svg>',
+    calc:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="14" x2="16" y2="18"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="8" y1="18" x2="8" y2="18"/><line x1="12" y1="18" x2="12" y2="18"/></svg>',
+    layers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>',
+    clock:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+    refresh:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>',
+  };
+
+  const root = document.getElementById('kpi-cards');
+  root.innerHTML = kpis.map(k => `
+    <div class="kpi">
+      <div class="kpi-icon ${k.color}">${ICONS[k.icon]}</div>
+      <div class="kpi-body">
+        <div class="kpi-label">${k.label}</div>
+        <div class="kpi-value">${k.val}<span class="unit">${k.unit}</span></div>
+        <div class="kpi-foot">${k.foot}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ * ⭐ v2.75g: T2N 불량 분석 — 확인된 불량을 투명하게 공개.
+ *   사내 검수 시 기록되는 [불량재현O/X:증상] 태그만 파싱해서 보여주고,
+ *   작업자·진행 상태(에이징/출고대기)·내부 수리 메모는 노출하지 않는다.
+ * ═════════════════════════════════════════════════════════════ */
+const T2N_DEF_MAP = { panel:'디스플레이(액정 패널)', pcb:'PCB', board:'충전단자', battery:'배터리', cover:'백커버·외관' };   // ⭐ KICC v1.3a: 견적서 명칭 기준
+function _t2nRep(e) {
+  const m = String(e.note || '').match(/^\[불량재현([OX])\s*(?::\s*([^\]]*))?\]/);
+  return m ? { r: m[1], sym: (m[2] || '').trim() } : null;
+}
+function renderT2NQuality() {
+  const card = document.getElementById('t2n-quality-card');
+  const body = document.getElementById('t2n-quality-body');
+  if(!card || !body) return;
+  const f = state.filter;
+  // ⭐ v2.75h: 정식 탭 — 조건이 안 맞아도 숨기지 않고 이유를 안내
+  if(f.model !== 'all' && normalizeModel(f.model) !== 'T2N') {
+    const t = document.getElementById('t2n-q-total'); if(t) t.textContent = '';
+    body.innerHTML = '<div style="padding:24px;color:var(--muted,#94a3b8);font-size:13px;">상단 기종 필터가 T2N이 아니라 표시하지 않아요 — 기종 필터를 <b>전체</b> 또는 <b>T2N</b>으로 바꿔주세요.</div>';
+    return;
+  }
+  // 접수일 기준 직접 필터 (공통 필터는 출고 완료 건만 통과시켜 출고 전 접수가 안 보였음)
+  let _from = f.dateFrom ? new Date(f.dateFrom) : null;
+  let _to = f.dateTo ? new Date(f.dateTo + 'T23:59:59') : null;
+  if(f.period && f.period !== 'all' && !f.dateFrom) {
+    const now = new Date();
+    if(f.period === 'thisMonth') { _from = new Date(now.getFullYear(), now.getMonth(), 1); _to = now; }
+    else if(f.period === 'lastMonth') { _from = new Date(now.getFullYear(), now.getMonth() - 1, 1); _to = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59); }
+  }
+  const _QR = {Q1:[1,3], Q2:[4,6], Q3:[7,9], Q4:[10,12]};
+  const _isQ = ['Q1','Q2','Q3','Q4'].includes(f.quarter);
+  const _hasYear = f.year && f.year !== 'all';
+  const _inRange = (e) => {
+    const d = e.date ? new Date(e.date) : null;
+    const okD = d && !isNaN(d.getTime());
+    if((_from || _to || _isQ || _hasYear) && !okD) return false;
+    if(_from && d < _from) return false;
+    if(_to && d > _to) return false;
+    if(_hasYear && d.getFullYear() !== Number(f.year)) return false;
+    if(_isQ) { const m = d.getMonth() + 1; const [s1, e1] = _QR[f.quarter]; if(m < s1 || m > e1) return false; }
+    if(f.yymm && f.yymm !== 'all' && extractYYMM(e.serial) !== f.yymm) return false;
+    if(f.serial && !String(e.serial || '').toLowerCase().includes(f.serial.toLowerCase())) return false;
+    return true;
+  };
+  const list = ((state.raw && state.raw.entries) || []).filter(e => normalizeModel(e.model) === 'T2N' && _inRange(e));
+  // ⭐ v2.75i: 수리 불가(교품) 처리된 T2N도 불량 데이터에 포함 (id 중복 제거는 수리불가 탭과 동일)
+  const _seenEx = new Set();
+  const exT2N = ((state.raw && state.raw.exchange) || []).filter(x => {
+    if(normalizeModel(x.model) !== 'T2N') return false;
+    const k = String(x.id || ((x.serial||'') + '|' + (x.date||'')));
+    if(_seenEx.has(k)) return false; _seenEx.add(k);
+    return _inRange(x);
+  });
+  if(!list.length && !exT2N.length) {
+    const t = document.getElementById('t2n-q-total'); if(t) t.textContent = '';
+    body.innerHTML = '<div style="padding:24px;color:var(--muted,#94a3b8);font-size:13px;">조회 조건(기간)에 해당하는 T2N AS 접수가 없습니다.</div>';
+    return;
+  }
+  const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+  const withRep = list.map(e => ({ e, rep: _t2nRep(e) }));
+  const repO = withRep.filter(x => x.rep && x.rep.r === 'O');
+  const repX = withRep.filter(x => x.rep && x.rep.r === 'X');
+
+  // 확인 불량 유형 — 재현O·무태그 수리건의 교체 작업 + 수리 불가(교품) 건의 작업 (재현 안 된 건 제외)
+  const defCnt = {};
+  const _addDef = (works, repTag) => {
+    const w = works || [];
+    const hw = Object.keys(T2N_DEF_MAP).filter(k => w.includes(k));
+    if(hw.length) hw.forEach(k => { defCnt[T2N_DEF_MAP[k]] = (defCnt[T2N_DEF_MAP[k]] || 0) + 1; });
+    else if(repTag) defCnt['기타 보정 (펌웨어 재설치 등)'] = (defCnt['기타 보정 (펌웨어 재설치 등)'] || 0) + 1;   // ⭐ KICC v1.3a
+  };
+  withRep.forEach(({ e, rep }) => { if(rep && rep.r === 'X') return; _addDef(e.works, rep && rep.r === 'O'); });
+  exT2N.forEach(x => { let w = x.works; if(!Array.isArray(w)) { try { w = JSON.parse(w||'[]'); } catch(_) { w = []; } } _addDef(w, true); });
+  const defItems = Object.entries(defCnt).sort((a, b) => b[1] - a[1]);
+  const defMax = Math.max(1, ...defItems.map(([, v]) => v));
+
+  // 월별 접수 추이 (수리 접수 + 수리 불가 합산)
+  const byMon = {};
+  list.forEach(e => { const m = String(e.date).slice(0, 7); byMon[m] = (byMon[m] || 0) + 1; });
+  exT2N.forEach(x => { const m = String(x.date).slice(0, 7); byMon[m] = (byMon[m] || 0) + 1; });
+  const mons = Object.keys(byMon).sort();
+  const monMax = Math.max(1, ...mons.map(m => byMon[m]));
+
+  const tEl = document.getElementById('t2n-q-total');
+  if(tEl) tEl.textContent = `AS 접수 ${fmt.num(list.length)}건 · 수리 불가 ${fmt.num(exT2N.length)}건 · 접수일 기준 (처리 중 포함)`;
+  const chip = (label, val, color) => `<div style="padding:8px 14px;border-radius:10px;background:var(--surface2,rgba(148,163,184,.08));min-width:110px;">
+    <div style="font-size:11px;color:var(--muted,#94a3b8);white-space:nowrap;">${label}</div>
+    <div style="font-size:17px;font-weight:800;color:${color || 'inherit'};">${val}</div></div>`;
+
+  let h = `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+    ${chip('AS 접수', fmt.num(list.length) + '건')}
+    ${chip('재현됨 (수리 불가 포함)', fmt.num(repO.length + exT2N.length) + '건', '#10b981')}
+    ${chip('재현 안 됨', fmt.num(repX.length) + '건', '#f43f5e')}
+    ${chip('수리 불가 (비용 초과)', fmt.num(exT2N.length) + '건', exT2N.length ? '#a855f7' : undefined)}
+  </div>`;
+
+  h += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-bottom:16px;">
+    <div><div style="font-size:12.5px;font-weight:700;margin-bottom:8px;">확인 불량 유형 <span style="font-size:10.5px;color:var(--muted,#94a3b8);font-weight:400;">· 재현 안 된 건 제외 · 수리 불가 포함</span></div>
+      ${defItems.length ? defItems.map(([k, v]) => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px;">
+        <span style="min-width:110px;">${esc(k)}</span>
+        <div style="flex:1;height:8px;border-radius:99px;background:rgba(148,163,184,.15);overflow:hidden;"><div style="height:100%;width:${Math.round(v / defMax * 100)}%;background:#f43f5e;border-radius:99px;"></div></div>
+        <b style="min-width:38px;text-align:right;">${fmt.num(v)}건</b></div>`).join('') : '<div style="font-size:12px;color:var(--muted,#94a3b8);">확인된 하드웨어 불량이 없습니다.</div>'}
+    </div>
+    <div><div style="font-size:12.5px;font-weight:700;margin-bottom:8px;">월별 접수 추이 <span style="font-size:10.5px;color:var(--muted,#94a3b8);font-weight:400;">· 수리 불가 포함</span></div>
+      <div style="display:flex;gap:8px;align-items:flex-end;height:90px;">
+        ${mons.map(m => `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;height:100%;justify-content:flex-end;">
+          <span style="font-size:10px;font-weight:700;">${byMon[m]}</span>
+          <div style="width:60%;max-width:40px;background:#3b82f6;border-radius:5px 5px 0 0;height:${Math.round(byMon[m] / monMax * 100)}%;min-height:3px;"></div>
+          <span style="font-size:10px;color:var(--muted,#94a3b8);">${m.slice(5)}월</span></div>`).join('')}
+      </div>
+    </div>
+  </div>`;
+
+  // 접수 상세 — 수리 접수 + 수리 불가(교품) 통합, 접수일 내림차순
+  // ⭐ v2.75l: 50건 제한 제거 — 전체 시리얼 표시 (수만 건 대비 200건 단위 페이지네이션)
+  const merged = [
+    ...withRep.map(({ e, rep }) => ({ date: e.date, serial: e.serial, rep, works: e.works || [], kind: 'repair' })),
+    ...exT2N.map(x => { let w = x.works; if(!Array.isArray(w)) { try { w = JSON.parse(w||'[]'); } catch(_) { w = []; } } return { date: x.date, serial: x.serial, rep: null, works: w, kind: 'exchange' }; })
+  ].sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  window._t2nRows = merged;
+  window._t2nPage = 1;
+  h += `<div style="font-size:12.5px;font-weight:700;margin-bottom:8px;">접수 상세 <span id="t2n-detail-count" style="font-size:10.5px;color:var(--muted,#94a3b8);font-weight:400;"></span></div>
+  <div style="overflow-x:auto;"><table class="data">
+    <thead><tr><th style="white-space:nowrap;">진단일</th><th>시리얼</th><th style="white-space:nowrap;">불량 재현 여부</th><th>조치 (수리 항목)</th></tr></thead>
+    <tbody id="t2n-detail-body"></tbody>
+  </table></div>
+  <div id="t2n-detail-pager" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px;flex-wrap:wrap;"></div>`;
+  body.innerHTML = h;
+  _t2nRenderRows();
+}
+
+/* ⭐ v2.75l: 접수 상세 페이지 렌더 — 전체 데이터를 들고 200건씩 표시 (수만 건에도 화면 안 무거움) */
+const _T2N_PAGE_SIZE = 200;
+function _t2nRowHtml(r) {
+  const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  // ⭐ v2.75n: 재현 여부는 재현됨(초록)/재현 안 됨(빨강)만 — 수리 불가 건도 불량이 확인된 것이라 '재현됨'.
+  //   수리 불가 사유는 조치 컬럼에 명시.
+  const repCell = (r.kind === 'exchange' || (r.rep && r.rep.r === 'O'))
+    ? '<span style="color:#10b981;font-weight:700;">재현됨</span>'
+    : (r.rep ? '<span style="color:#f43f5e;font-weight:700;">재현 안 됨</span>' : '<span style="color:var(--muted,#94a3b8);">-</span>');
+  // 수리 불가 건도 '어떤 작업이 필요했는지'를 먼저 보여주고 → 사유를 붙임
+  const wsTxt = (r.works || []).map(w => esc(workName(w))).join(', ');
+  const actCell = r.kind === 'exchange'
+    ? `${wsTxt ? wsTxt + ' 필요 ' : ''}<span style="color:#a855f7;font-weight:700;">→ 비용 초과로 인한 수리 불가</span> <span style="font-size:10.5px;color:var(--muted,#94a3b8);">(수리비가 새 제품 구매가 수준)</span>`
+    : (wsTxt || '-');
+  return `<tr>
+    <td style="white-space:nowrap;">${String(r.date).slice(0, 10)}</td>
+    <td style="font-family:monospace;font-size:11.5px;">${esc(r.serial)}</td>
+    <td style="white-space:nowrap;">${repCell}</td>
+    <td style="font-size:12px;">${actCell}</td>
+  </tr>`;
+}
+function _t2nRenderRows() {
+  const rows = window._t2nRows || [];
+  const pages = Math.max(1, Math.ceil(rows.length / _T2N_PAGE_SIZE));
+  window._t2nPage = Math.min(Math.max(1, window._t2nPage || 1), pages);
+  const p = window._t2nPage;
+  const tb = document.getElementById('t2n-detail-body');
+  if(!tb) return;
+  tb.innerHTML = rows.length
+    ? rows.slice((p - 1) * _T2N_PAGE_SIZE, p * _T2N_PAGE_SIZE).map(_t2nRowHtml).join('')
+    : '<tr><td colspan="4" style="text-align:center;color:var(--muted,#94a3b8);padding:20px;">표시할 접수 내역이 없습니다.</td></tr>';
+  const cnt = document.getElementById('t2n-detail-count');
+  if(cnt) cnt.textContent = `· 전체 ${fmt.num(rows.length)}건` + (pages > 1 ? ` · ${(p - 1) * _T2N_PAGE_SIZE + 1}~${Math.min(p * _T2N_PAGE_SIZE, rows.length)}건 표시` : '');
+  const pg = document.getElementById('t2n-detail-pager');
+  if(pg) {
+    if(pages <= 1) { pg.innerHTML = ''; return; }
+    const btn = (label, target, disabled) => `<button onclick="_t2nSetPage(${target})" ${disabled ? 'disabled' : ''} style="padding:6px 12px;border-radius:8px;border:1px solid var(--line,#e2e8f0);background:var(--surface,transparent);color:inherit;font-size:12px;cursor:${disabled ? 'default' : 'pointer'};opacity:${disabled ? '.4' : '1'};">${label}</button>`;
+    pg.innerHTML = btn('« 처음', 1, p === 1) + btn('‹ 이전', p - 1, p === 1)
+      + `<span style="font-size:12px;color:var(--muted,#94a3b8);padding:0 6px;">${p} / ${fmt.num(pages)} 페이지</span>`
+      + btn('다음 ›', p + 1, p === pages) + btn('마지막 »', pages, p === pages);
+  }
+}
+function _t2nSetPage(p) {
+  window._t2nPage = p;
+  _t2nRenderRows();
+  try { document.getElementById('t2n-detail-count').scrollIntoView({ block: 'nearest' }); } catch(e) {}
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ *  RENDER: 대시보드 차트
+ * ═════════════════════════════════════════════════════════════ */
+// ⭐ v2.75i 핫픽스: T2N 탭 재작성 때 치환 범위 오류로 이 함수가 삭제되어
+//   대시보드가 "destroyChart is not defined"로 전체 로드 실패하던 문제 복구
+function destroyChart(key) {
+  const c = state.charts[key];
+  if(c && typeof c.destroy === 'function') c.destroy();
+  delete state.charts[key];
+}
+
+const CHART_COLORS = {
+  blue:'#3b82f6', emerald:'#10b981', amber:'#f59e0b', purple:'#a855f7',
+  rose:'#f43f5e', cyan:'#06b6d4',
+};
+const WORK_COLORS = {
+  // ⭐ KICC v1.3a: KICC 작업명 기준
+  '논배터리': '#3b82f6',
+  '일체형 액정 패널 교체': '#10b981',
+  'PCB 교체': '#f59e0b',
+  '충전단자 수리': '#a855f7',
+  '백커버 교체': '#06b6d4',
+  '기타 보정': '#94a3b8',
+};
+
+/* 수리 항목 분포 도넛 */
+function renderDistribution() {
+  const data = state.filtered;
+  const counts = {};
+  data.forEach(e => (e.works||[]).forEach(w => {
+    const name = workName(w);
+    counts[name] = (counts[name]||0) + 1;
+  }));
+  const items = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+  const total = items.reduce((s,[,v])=>s+v, 0);
+
+  document.getElementById('dist-total').textContent = `총 ${fmt.num(total)}건`;
+
+  destroyChart('dist');
+  state.charts.dist = new Chart(document.getElementById('chart-dist'), {
+    type:'doughnut',
+    data: {
+      labels: items.map(([k])=>k),
+      datasets: [{
+        data: items.map(([,v])=>v),
+        backgroundColor: items.map(([k]) => WORK_COLORS[k] || '#94a3b8'),
+        borderWidth: 0,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '65%',
+      plugins: { legend: { display: false } },
+    },
+  });
+
+  document.getElementById('dist-legend').innerHTML = items.map(([k,v]) => `
+    <div class="dist-row">
+      <div class="dist-dot" style="background:${WORK_COLORS[k]||'#94a3b8'}"></div>
+      <div class="dist-name">${k}</div>
+      <div class="dist-val">${fmt.num(v)}건</div>
+      <div class="dist-pct">${total>0?((v/total)*100).toFixed(0)+'%':'0%'}</div>
+    </div>
+  `).join('');
+}
+
+/* 월별 AS 비용 & 건수 추이 */
+function renderMonthly() {
+  const buckets = {};
+  state.filtered.forEach(e => {
+    const ym = fmt.ym(e.shipDate || e.date);  // 출고월 기준
+    if(!buckets[ym]) buckets[ym] = { sum:0, cnt:0, paid:0, free:0 };
+    // ⭐ KICC v1.3: 월별 AS 비용 = 작업별 포함단가 + 기본 작업비 (KICC 청구 기준)
+    buckets[ym].sum += kiccTotal(e);
+    buckets[ym].cnt += 1;
+    // ⭐ KICC v1.3d: 유상/무상 월별 취합
+    if(kiccPaid(e)) buckets[ym].paid += 1; else buckets[ym].free += 1;
+  });
+  const months = Object.keys(buckets).sort().slice(-6);
+  const labels = months.map(m => parseInt(m.slice(5))+'월');
+  const sums = months.map(m => Math.round(buckets[m].sum/10000)); // 만원
+  const cnts = months.map(m => buckets[m].cnt);
+  const paids = months.map(m => buckets[m].paid);
+  const frees = months.map(m => buckets[m].free);
+
+  destroyChart('monthly');
+  state.charts.monthly = new Chart(document.getElementById('chart-monthly'), {
+    data: {
+      labels,
+      datasets: [
+        { type:'bar', label:'AS비용(만원)', data:sums, backgroundColor:'rgba(59,130,246,.6)', borderRadius:4, yAxisID:'y' },
+        { type:'line', label:'총 건수', data:cnts, borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,.1)', tension:.3, yAxisID:'y1', pointRadius:4, pointBackgroundColor:'#f59e0b' },
+        // ⭐ KICC v1.3d: 유상/무상 건수 분리 표시
+        { type:'line', label:'유상', data:paids, borderColor:'#10b981', borderDash:[5,3], tension:.3, yAxisID:'y1', pointRadius:3, pointBackgroundColor:'#10b981', backgroundColor:'transparent' },
+        { type:'line', label:'무상', data:frees, borderColor:'#94a3b8', borderDash:[3,3], tension:.3, yAxisID:'y1', pointRadius:3, pointBackgroundColor:'#94a3b8', backgroundColor:'transparent' },
+      ],
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      interaction:{ mode:'index', intersect:false },
+      plugins:{
+        legend:{ display:true, position:'top', align:'end', labels:{ boxWidth:12, padding:12, font:{ size:11 } } },
+      },
+      scales:{
+        y:{ position:'left', beginAtZero:true, ticks:{ callback:v=>v+'만', font:{size:10} }, grid:{ color:'#f1f5f9' } },
+        y1:{ position:'right', beginAtZero:true, ticks:{ callback:v=>v+'건', font:{size:10} }, grid:{ display:false } },
+        x:{ ticks:{ font:{size:11} }, grid:{ display:false } },
+      },
+    },
+  });
+}
+
+/* 제조년월별 작업 추이 */
+function renderYYMM() {
+  const counts = {};
+  state.filtered.forEach(e => {
+    const ym = extractYYMM(e.serial);
+    if(ym) counts[ym] = (counts[ym]||0) + 1;
+  });
+  const months = Object.keys(counts).sort().slice(-8);
+  destroyChart('yymm');
+  state.charts.yymm = new Chart(document.getElementById('chart-yymm'), {
+    type:'line',
+    data:{
+      labels: months,
+      datasets:[{
+        label:'건수',
+        data: months.map(m => counts[m]),
+        borderColor:'#06b6d4',
+        backgroundColor:'rgba(6,182,212,.15)',
+        fill:true, tension:.4,
+        pointRadius:4, pointBackgroundColor:'#06b6d4',
+      }],
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false } },
+      scales:{
+        y:{ beginAtZero:true, ticks:{ font:{size:10} }, grid:{ color:'#f1f5f9' } },
+        x:{ ticks:{ font:{size:10} }, grid:{ display:false } },
+      },
+    },
+  });
+}
+
+/* ⭐ KICC v1.3: 작업별 비용 (비용 구조 분석 대체)
+ * KICC 청구 방식 그대로 — 작업별 부품·공임 포함 단가 × 건수 + 기본 작업비(건당) */
+function renderWorkCost() {
+  const usage = {}; // { pcb:{cnt}, panel:{cnt}, ... }
+  state.filtered.forEach(e => {
+    (e.works||[]).forEach(w => {
+      // panel/lcd, board/mb 등 동일 항목 키 통합
+      const k = (w === 'lcd') ? 'panel' : (w === 'mb') ? 'board' : w;
+      (usage[k] = usage[k] || { cnt:0 }).cnt++;
+    });
+  });
+  const totalCnt = state.filtered.length;
+  // ⭐ KICC v1.3c: 기본 작업비는 유상 건에만 청구 (무상 수리건은 청구 제외)
+  const paidCnt = state.filtered.filter(kiccPaid).length;
+  const freeCnt = totalCnt - paidCnt;
+  const baseSum = paidCnt * KICC_BASE_FEE;
+
+  let grand = baseSum;
+  const rows = Object.entries(usage)
+    .map(([w, u]) => {
+      const price = Number(KICC_PRICES[w]);
+      const known = Number.isFinite(price);
+      const sum = known ? price * u.cnt : 0;
+      grand += sum;
+      return { w, cnt: u.cnt, price, known, sum };
+    })
+    .sort((a,b) => b.sum - a.sum);
+
+  const cell = 'padding:6px 4px;font-size:11.5px;';
+  const num = cell + 'text-align:right;font-variant-numeric:tabular-nums;';
+  const rowHtml = rows.map(r => `
+    <tr style="border-bottom:1px solid var(--border);">
+      <td style="${cell}">${kiccWorkName(r.w)}${r.known ? '' : ' <span style="font-size:10px;color:#f59e0b;">단가 미정</span>'}</td>
+      <td style="${num}color:var(--text-3);">${r.known ? fmt.num(r.price)+'원' : '—'}</td>
+      <td style="${num}">${fmt.num(r.cnt)}건</td>
+      <td style="${num}font-weight:700;">${r.known ? fmt.num(r.sum)+'원' : '—'}</td>
+    </tr>`).join('');
+
+  document.getElementById('workcost-table').innerHTML = `
+    <table style="width:100%;border-collapse:collapse;">
+      <thead>
+        <tr style="border-bottom:2px solid var(--border);color:var(--text-3);font-size:10.5px;">
+          <th style="${cell}text-align:left;font-weight:600;">작업 항목</th>
+          <th style="${num}font-weight:600;">단가</th>
+          <th style="${num}font-weight:600;">건수</th>
+          <th style="${num}font-weight:600;">금액</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rowHtml}
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="${cell}">기본 작업 (세척 + S/W 설치)</td>
+          <td style="${num}color:var(--text-3);">${fmt.num(KICC_BASE_FEE)}원</td>
+          <td style="${num}">${fmt.num(paidCnt)}건</td>
+          <td style="${num}font-weight:700;">${fmt.num(baseSum)}원</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td style="${cell}font-weight:800;" colspan="3">합계</td>
+          <td style="${num}font-weight:800;font-size:12.5px;color:var(--accent,#2563eb);">${fmt.num(grand)}원</td>
+        </tr>
+      </tfoot>
+    </table>
+  `;
+}
+
+/* 수리 복잡도 분석 */
+function renderComplexity() {
+  const buckets = { 1:0, 2:0, 3:0, '4+':0 };
+  state.filtered.forEach(e => {
+    const n = (e.works||[]).length;
+    if(n <= 1) buckets[1]++;
+    else if(n === 2) buckets[2]++;
+    else if(n === 3) buckets[3]++;
+    else buckets['4+']++;
+  });
+  const total = state.filtered.length || 1;
+  const colors = ['#3b82f6','#10b981','#f59e0b','#a855f7'];
+  const labels = ['단일 (1항목)','2항목','3항목','4항목 이상'];
+  const keys = [1,2,3,'4+'];
+  const root = document.getElementById('complexity-bars');
+  root.innerHTML = keys.map((k,i) => {
+    const v = buckets[k];
+    const pct = (v/total*100).toFixed(0);
+    return `
+      <div class="mini-bar">
+        <div class="lbl">${labels[i]}</div>
+        <div class="track"><div class="fill" style="width:${pct}%;background:${colors[i]}"></div></div>
+        <div class="v">${v}건 ${pct}%</div>
+      </div>`;
+  }).join('');
+}
+
+/* 고장 원인 Top 5 */
+function renderTopCauses() {
+  const counts = {};
+  state.filtered.forEach(e => {
+    (e.works||[]).forEach(w => {
+      const name = workName(w);
+      counts[name] = (counts[name]||0) + 1;
+    });
+  });
+  const top = Object.entries(counts).sort((a,b) => b[1]-a[1]).slice(0,5);
+  const root = document.getElementById('top-causes');
+  if(!top.length) { root.innerHTML = '<div class="empty">데이터가 없습니다</div>'; return; }
+  root.innerHTML = top.map(([name,cnt],i) => `
+    <div class="top-row">
+      <div class="top-rank">${i+1}</div>
+      <div class="top-name">${name}</div>
+      <div class="top-val">${fmt.num(cnt)}건</div>
+    </div>
+  `).join('');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ *  RENDER: 수리 분석 탭
+ * ═════════════════════════════════════════════════════════════ */
+function renderQuarter() {
+  const buckets = { Q1:0, Q2:0, Q3:0, Q4:0 };
+  state.filtered.forEach(e => {
+    // ⭐ 이 차트는 '제조분기' 기준 (시리얼의 제조년월)
+    const ym = extractYYMM(e.serial);
+    if(!ym) return;
+    const m = parseInt(ym.slice(5));
+    const q = m<=3?'Q1':m<=6?'Q2':m<=9?'Q3':'Q4';
+    if(buckets[q] !== undefined) buckets[q]++;
+  });
+  destroyChart('quarter');
+  state.charts.quarter = new Chart(document.getElementById('chart-quarter'), {
+    type:'bar',
+    data:{
+      labels:['Q1','Q2','Q3','Q4'],
+      datasets:[{
+        data:[buckets.Q1, buckets.Q2, buckets.Q3, buckets.Q4],
+        backgroundColor:['#60a5fa','#fbbf24','#f97316','#a855f7'],
+        borderRadius:4,
+      }],
+    },
+    options:{
+      indexAxis:'y',
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false } },
+      scales:{
+        x:{ beginAtZero:true, ticks:{ font:{size:10} }, grid:{ color:'#f1f5f9' } },
+        y:{ ticks:{ font:{size:11} }, grid:{ display:false } },
+      },
+    },
+  });
+}
+
+function renderWorktype() {
+  const single = state.filtered.filter(e => (e.works||[]).length <= 1);
+  const multi = state.filtered.filter(e => (e.works||[]).length >= 2);
+  const sumS = single.reduce((s,e)=>s+kiccTotal(e),0);   // ⭐ KICC v1.3: KICC 청구 기준
+  const sumM = multi.reduce((s,e)=>s+kiccTotal(e),0);
+
+  destroyChart('worktype');
+  state.charts.worktype = new Chart(document.getElementById('chart-worktype'), {
+    type:'doughnut',
+    data:{
+      labels:['단일수리','복합수리'],
+      datasets:[{ data:[sumS, sumM], backgroundColor:['#10b981','#f59e0b'], borderWidth:0 }],
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      cutout:'62%',
+      plugins:{
+        legend:{ display:true, position:'bottom', labels:{ boxWidth:10, padding:12, font:{size:11} } },
+      },
+    },
+  });
+}
+
+function renderHeatmap() {
+  // 월(1)~토(6) × W1~W4
+  const grid = {};
+  for(let d=1; d<=6; d++) { grid[d] = {1:0,2:0,3:0,4:0}; }
+  state.filtered.forEach(e => {
+    const dt = new Date(e.shipDate || e.date);  // 출고일 기준
+    let dow = dt.getDay(); // 0=일 ~ 6=토
+    if(dow === 0) return; // 일요일 제외
+    const w = getWeekOfMonth(e.shipDate || e.date);  // 출고일 기준
+    grid[dow][w] = (grid[dow][w]||0) + 1;
+  });
+
+  const dayNames = ['','월','화','수','목','금','토'];
+  const allVals = Object.values(grid).flatMap(v => Object.values(v));
+  const max = Math.max(...allVals, 1);
+
+  const lerp = (a,b,t) => Math.round(a + (b-a)*t);
+  const cellColor = (intensity) => {
+    // 불투명 파랑 스케일 (연파랑 → 진파랑) — 페이지 배경과 무관하게 일정
+    const lo=[219,234,254], hi=[29,78,216];
+    return `rgb(${lerp(lo[0],hi[0],intensity)},${lerp(lo[1],hi[1],intensity)},${lerp(lo[2],hi[2],intensity)})`;
+  };
+
+  let html = '<div class="h-head"></div>';
+  for(let w=1; w<=4; w++) html += `<div class="h-head">W${w}</div>`;
+  for(let d=1; d<=6; d++) {
+    html += `<div class="h-row-label">${dayNames[d]}</div>`;
+    for(let w=1; w<=4; w++) {
+      const v = grid[d][w];
+      if(v === 0) {
+        html += `<div class="h-cell" style="background:var(--surface-2,#f1f5f9);color:var(--text-3);">0</div>`;
+      } else {
+        const intensity = v / max;
+        const bg = cellColor(intensity);
+        const txt = intensity > 0.45 ? '#ffffff' : '#1e3a8a';
+        html += `<div class="h-cell" style="background:${bg};color:${txt};text-shadow:${intensity>0.45?'0 1px 2px rgba(0,0,0,.3)':'none'};">${v}</div>`;
+      }
+    }
+  }
+  document.getElementById('heatmap-weekly').innerHTML = html;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ *  RENDER: 출고 목록 탭
+ * ═════════════════════════════════════════════════════════════ */
+// ⭐ v2.74: 출고 목록 행 계산 — 화면(renderShipping)과 엑셀 내보내기가 '완전히 같은 목록·순서'를
+//   쓰도록 공용 함수로 분리. (기존 엑셀은 수리건 기준 별도 목록이라 화면 No.와 순서가 어긋났음)
+function computeShipRows() {
+  const ship = state.filteredShip;
+  const entries = state.filtered;
+  // 처리일(등록일~출고일) 매칭용은 전체 entries 기준
+  // (출고일 필터로 본 항목의 등록일은 다른 기간일 수 있음)
+  const allEntries = state.raw.entries || [];
+  // ⭐ v2.71b: 재인입(같은 시리얼 2차 수리) 대응 — 출고 행마다 '그 출고일 이전 등록된 가장 최근' 수리 기록을 짝지음.
+  const entriesBySerial = new Map();
+  allEntries.forEach(e => {
+    if(!entriesBySerial.has(e.serial)) entriesBySerial.set(e.serial, []);
+    entriesBySerial.get(e.serial).push(e);
+  });
+  entriesBySerial.forEach(l => l.sort((a, b) => new Date(a.date) - new Date(b.date)));
+  const dayKey = (v) => { const d = new Date(v); return isNaN(d) ? '' : `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+  const entryForShip = (s) => {
+    const l = entriesBySerial.get(s.serial);
+    if(!l || !l.length) return undefined;
+    if(l.length === 1) return l[0];
+    const sk = dayKey(s.shipDate);
+    if(!sk) return l[l.length - 1];
+    for(let i = l.length - 1; i >= 0; i--) { const ek = dayKey(l[i].date); if(ek && ek <= sk) return l[i]; }
+    return l[0];
+  };
+
+  // 출고 = ship에 있음 / 미출고 = '이 수리 건 등록일 이후'의 출고 기록이 없는 건
+  const shipsBySerial = new Map();
+  ship.forEach(s => { if(!shipsBySerial.has(s.serial)) shipsBySerial.set(s.serial, []); shipsBySerial.get(s.serial).push(s); });
+  const pending = entries.filter(e => {
+    const l = shipsBySerial.get(e.serial);
+    if(!l || !l.length) return true;
+    const ek = dayKey(e.date);
+    return !l.some(s => { const sk = dayKey(s.shipDate); return sk && (!ek || sk >= ek); });
+  });
+
+  // ⭐ v2.75: 재인입 회차 — 같은 시리얼의 몇 번째 수리인지 (1차=최초, 2차 이상=재인입)
+  const visitOf = (e) => {
+    if(!e) return 1;
+    const l = entriesBySerial.get(e.serial);
+    if(!l || l.length <= 1) return 1;
+    const i = l.indexOf(e);
+    return i >= 0 ? i + 1 : 1;
+  };
+
+  const rows = [];
+  ship.forEach((s, idx) => {
+    const e = entryForShip(s);
+    const repairDate = e ? new Date(e.date) : null;
+    const shipDate = s.shipDate ? new Date(s.shipDate) : null;
+    const processDays = (repairDate && shipDate)
+      ? Math.max(0.1, (shipDate - repairDate) / 86400000)
+      : null;
+    const billed = e ? kiccTotal(e) : 0;   // ⭐ KICC v1.3: KICC 청구 기준
+    rows.push({
+      no: idx+1,
+      serial: s.serial,
+      model: s.model || (e?.model || '-'),
+      works: s.works ? fixWorkStr(s.works) : ((e?.works||[]).map(workName).join(' / ')),
+      shipDate: s.shipDate || '-',
+      shipDay: dayKey(s.shipDate),   // ⭐ v2.74: 엑셀용 YYYY-MM-DD
+      visit: visitOf(e),             // ⭐ v2.75: 재인입 회차
+      processDays,
+      billed,
+      status: '출고완료',
+      bgrade: !!(e && String(e.note || '').includes('[B급]')),
+    });
+  });
+  pending.forEach((e) => {
+    rows.push({
+      no: rows.length + 1,
+      serial: e.serial,
+      model: e.model,
+      works: (e.works||[]).map(workName).join(' / '),
+      shipDate: '-',
+      shipDay: '',
+      visit: visitOf(e),
+      processDays: null,
+      billed: 0, // 미출고는 미청구
+      status: '출고대기',
+      bgrade: String(e.note || '').includes('[B급]'),
+    });
+  });
+  return rows;
+}
+
+function renderShipping() {
+  const rows = computeShipRows();
+  // 통계
+  const done = rows.filter(r => r.status === '출고완료').length;
+  const wait = rows.filter(r => r.status === '출고대기').length;
+  const processList = rows.filter(r => r.processDays !== null).map(r => r.processDays);
+  const avgProcess = processList.length ? processList.reduce((a,b)=>a+b,0)/processList.length : 0;
+  // 청구 금액 합계 (출고완료 기준)
+  const sumBilled = rows.filter(r => r.status === '출고완료').reduce((s,r) => s + (r.billed||0), 0);
+
+  document.getElementById('ship-kpi').innerHTML = `
+    <div class="card" style="padding:14px 16px">
+      <div style="font-size:12px;color:var(--text-3);font-weight:600;margin-bottom:6px">출고 완료</div>
+      <div style="font-size:22px;font-weight:700;letter-spacing:-.02em">${fmt.num(done)}<span style="font-size:13px;color:var(--text-2);margin-left:2px">건</span></div>
+    </div>
+    <div class="card" style="padding:14px 16px">
+      <div style="font-size:12px;color:var(--text-3);font-weight:600;margin-bottom:6px">출고 대기</div>
+      <div style="font-size:22px;font-weight:700;letter-spacing:-.02em">${fmt.num(wait)}<span style="font-size:13px;color:var(--text-2);margin-left:2px">건</span></div>
+    </div>
+    <div class="card" style="padding:14px 16px">
+      <div style="font-size:12px;color:var(--text-3);font-weight:600;margin-bottom:6px">평균 처리일</div>
+      <div style="font-size:22px;font-weight:700;letter-spacing:-.02em">${avgProcess.toFixed(1)}<span style="font-size:13px;color:var(--text-2);margin-left:2px">일</span></div>
+    </div>
+    <div class="card" style="padding:14px 16px">
+      <div style="font-size:12px;color:var(--text-3);font-weight:600;margin-bottom:6px">총 청구 금액</div>
+      <div style="font-size:22px;font-weight:700;letter-spacing:-.02em">${fmt.num(sumBilled)}<span style="font-size:13px;color:var(--text-2);margin-left:2px">원</span></div>
+      <div style="font-size:11px;color:var(--text-3);margin-top:4px">작업별 단가 합산 · VAT 포함</div>
+    </div>
+  `;
+
+  // Table + 페이지네이션
+  const tbody = document.querySelector('#ship-table tbody');
+  // ⭐ v2.74: '전체 보기' 지원 — pageSize 'all'이면 한 번에 모두 표시
+  const pageSize = state.shippingPageSize === 'all' ? Math.max(1, rows.length) : Number(state.shippingPageSize) || 20;
+  const _psSel = document.getElementById('ship-page-size');
+  if(_psSel && _psSel.value !== String(state.shippingPageSize)) _psSel.value = String(state.shippingPageSize);
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  // 페이지 범위 보정 (필터 변경 등으로 페이지 초과 시)
+  if(state.shippingPage > totalPages) state.shippingPage = totalPages;
+  if(state.shippingPage < 1) state.shippingPage = 1;
+  const startIdx = (state.shippingPage - 1) * pageSize;
+  const rowsToShow = rows.slice(startIdx, startIdx + pageSize);
+
+  // ⭐ v2.71a: 상태(출고완료 배지) 컬럼 → '외관 상태' 컬럼 — 출고 여부는 출고일로 충분,
+  //   여기엔 제품 등급(B급)만 가운데 정렬로 표기. B급이 아니면 '-'.
+  tbody.innerHTML = rowsToShow.map(r => {
+    return `
+      <tr>
+        <td>${r.no}</td>
+        <td style="font-family:monospace;font-size:12.5px">${r.serial}</td>
+        <td>${r.model}</td>
+        <td>${r.works}</td>
+        <td>${r.shipDate}</td>
+        <td>${r.processDays !== null ? r.processDays.toFixed(1)+'일' : '-'}</td>
+        <td style="text-align:right;font-variant-numeric:tabular-nums">${r.billed ? fmt.num(r.billed)+'원' : '-'}</td>
+        <td style="text-align:center">${r.bgrade ? '<span class="tag" style="background:rgba(245,158,11,.14);color:#f59e0b;border:1px solid rgba(245,158,11,.45);font-weight:700;">B급</span>' : '<span style="color:var(--text-3)">-</span>'}</td>
+      </tr>`;
+  }).join('') || '<tr><td colspan="8"><div class="empty">데이터가 없습니다</div></td></tr>';
+
+  // 페이지네이션 컨트롤 렌더
+  const pgEl = document.getElementById('ship-pagination');
+  if(pgEl) {
+    if(rows.length === 0) {
+      pgEl.innerHTML = '';
+    } else {
+      const fromN = startIdx + 1;
+      const toN = Math.min(startIdx + pageSize, rows.length);
+      pgEl.innerHTML = `
+        <div class="pg-info">${fromN}–${toN} / 총 ${fmt.num(rows.length)}건</div>
+        <div class="pg-buttons">
+          <button class="pg-btn" ${state.shippingPage<=1?'disabled':''} onclick="goShippingPage(1)">처음</button>
+          <button class="pg-btn" ${state.shippingPage<=1?'disabled':''} onclick="goShippingPage(${state.shippingPage-1})">이전</button>
+          <span class="pg-cur">${state.shippingPage} / ${totalPages}</span>
+          <button class="pg-btn" ${state.shippingPage>=totalPages?'disabled':''} onclick="goShippingPage(${state.shippingPage+1})">다음</button>
+          <button class="pg-btn" ${state.shippingPage>=totalPages?'disabled':''} onclick="goShippingPage(${totalPages})">끝</button>
+        </div>`;
+    }
+  }
+}
+
+function goShippingPage(n) {
+  state.shippingPage = n;
+  renderShipping();
+}
+
+/* ⭐ v2.74: 페이지당 조회 건수 변경 */
+function setShippingPageSize(v) {
+  state.shippingPageSize = (v === 'all') ? 'all' : (Number(v) || 20);
+  state.shippingPage = 1;
+  renderShipping();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ *  RENDER: 비용 비교 탭
+ * ═════════════════════════════════════════════════════════════ */
+function _escP(s) { return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function _parsePartsObj(raw) {
+  if(!raw) return {};
+  if(typeof raw === 'object') return raw;
+  const str = String(raw).trim();
+  if(!str) return {};
+  try { const j = JSON.parse(str); if(j && typeof j === 'object') return j; } catch {}
+  const o = {};
+  str.split(/[&|]/).forEach(kv => {
+    const i = kv.indexOf('='); if(i < 1) return;
+    let k = kv.slice(0, i), v = kv.slice(i+1);
+    try { k = decodeURIComponent(k); } catch {}
+    const n = Number(v); if(k && n > 0) o[k] = n;
+  });
+  return o;
+}
+/* ⭐ v2.75g: 수리 불가(교품) 목록 계산 — 화면(renderExchange)과 엑셀 내보내기가
+   '완전히 같은 목록·같은 순서'를 쓰도록 공용 함수로 분리 (출고 목록의 computeShipRows와 같은 원리). */
+function _exchangeRows() {
+  // ⭐ v2.70k: 같은 id 중복 행(과거 이중 등록 잔재) 제거 — 사내전산과 건수 일치 (577 vs 584 불일치 해소)
+  const _seenX = new Set();
+  const exAll = ((state.raw && state.raw.exchange) || []).filter(x => {
+    const k = String(x.id || ((x.serial||'') + '|' + (x.date||'')));
+    if(_seenX.has(k)) return false; _seenX.add(k); return true;
+  });
+  // ⭐ v2.75f: 상단 공통 필터(기간·연도·분기·기종·제조년월·시리얼) 적용 — 처리일(x.date) 기준.
+  const f = state.filter || {};
+  let _from = f.dateFrom ? new Date(f.dateFrom) : null;
+  let _to = f.dateTo ? new Date(f.dateTo + 'T23:59:59') : null;
+  if(f.period && f.period !== 'all' && !f.dateFrom) {
+    const now = new Date();
+    if(f.period === 'thisMonth') { _from = new Date(now.getFullYear(), now.getMonth(), 1); _to = now; }
+    else if(f.period === 'lastMonth') { _from = new Date(now.getFullYear(), now.getMonth()-1, 1); _to = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59); }
+  }
+  const _QR = {Q1:[1,3], Q2:[4,6], Q3:[7,9], Q4:[10,12]};
+  const _isQ = ['Q1','Q2','Q3','Q4'].includes(f.quarter);
+  const _hasYear = f.year && f.year !== 'all';
+  const ex = exAll.filter(x => {
+    const d = x.date ? new Date(x.date) : null;
+    const okD = d && !isNaN(d.getTime());
+    if((_from || _to || _isQ || _hasYear) && !okD) return false;
+    if(_from && d < _from) return false;
+    if(_to && d > _to) return false;
+    if(_hasYear && d.getFullYear() !== Number(f.year)) return false;
+    if(_isQ) { const m = d.getMonth()+1; const [s1,e1] = _QR[f.quarter]; if(m < s1 || m > e1) return false; }
+    if(f.model && f.model !== 'all' && normalizeModel(x.model) !== normalizeModel(f.model)) return false;
+    if(f.yymm && f.yymm !== 'all' && extractYYMM(x.serial) !== f.yymm) return false;
+    if(f.serial && !String(x.serial||'').toLowerCase().includes(f.serial.toLowerCase())) return false;
+    return true;
+  });
+  // ⭐ v2.70k: 기종 칩 필터 — 표기는 _N 제거된 고객 노출용
+  const _mKey = (m) => String(m||'').replace(/_N$/i,'').toUpperCase() || '-';
+  window._excModelF = window._excModelF || 'all';
+  const models = [...new Set(ex.map(x => _mKey(x.model)))].sort();
+  if(window._excModelF !== 'all' && !models.includes(window._excModelF)) window._excModelF = 'all';
+  const fex = window._excModelF === 'all' ? ex : ex.filter(x => _mKey(x.model) === window._excModelF);
+  const rows = fex.slice().sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
+  return { exAll, ex, fex, rows, models, _mKey };
+}
+
+function renderExchange() {
+  const { exAll, ex, fex: _fexPre, rows: _rowsPre, models, _mKey } = _exchangeRows();
+  const tbody = document.getElementById('exchange-tbody');
+  const cnt = document.getElementById('exchange-count');
+  if(!tbody) return;
+  const filterEl = document.getElementById('exchange-model-filter');
+  if(filterEl) {
+    const chip = (val, label, count) => {
+      const on = window._excModelF === val;
+      return `<button onclick="window._excModelF='${val}';renderExchange()" style="cursor:pointer;font-size:12px;font-weight:700;padding:5px 12px;border-radius:99px;border:1px solid ${on?'var(--accent,#2563eb)':'var(--line,#e5e7eb)'};background:${on?'var(--accent,#2563eb)':'transparent'};color:${on?'#fff':'var(--text-2,#555)'};">${label} ${count}</button>`;
+    };
+    filterEl.innerHTML = models.length > 1
+      ? chip('all', '전체', ex.length) + models.map(m => chip(m, m, ex.filter(x => _mKey(x.model) === m).length)).join('')
+      : '';
+  }
+  const fex = _fexPre;
+  const _hasPeriodF = ex.length !== exAll.length;
+  if(cnt) cnt.textContent = `${fmt.num(fex.length)}건${(window._excModelF!=='all' && ex.length !== fex.length) ? ` / 조회 ${fmt.num(ex.length)}건` : ''}${_hasPeriodF ? ` / 전체 ${fmt.num(exAll.length)}건` : ''}`;
+  if(!fex.length) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:20px;">${_hasPeriodF ? '조회 기간에 해당하는 수리 불가 처리 내역이 없습니다.' : '수리 불가 처리 내역이 없습니다.'}</td></tr>`;
+    return;
+  }
+  const rows = _rowsPre;
+  // ⚠️ 엔지니어명(worker)은 고객 노출 금지 — 절대 렌더하지 않음
+  tbody.innerHTML = rows.map((x,i) => `
+    <tr>
+      <td>${i+1}</td>
+      <td style="font-family:monospace;">${_escP(x.serial||'-')}</td>
+      <td>${_escP(String(x.model||'-').replace(/_N$/i,''))}</td>  <!-- 교품은 재작업 전 기기 — _N 미표기 -->
+      <td style="text-align:left;">비용 초과${Number(x.estimatedCost) > 0 ? ` <span style="color:var(--text-3);">(예상 수리비 ${fmt.won(Number(x.estimatedCost))})</span>` : ''}</td>
+      <td>${fmt.date(x.date)}</td>
+    </tr>`).join('');
+}
+
+function _isConsumablePart(stockItem) {
+  // 소모성: 재고 체크박스(consumable=1) 또는 이름에 '필름' 포함 (필름·보호지류)
+  if(!stockItem) return false;
+  if(Number(stockItem.consumable) === 1) return true;
+  return /필름/.test(String(stockItem.name||''));
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ *  RENDER: 알림 센터
+ * ═════════════════════════════════════════════════════════════ */
+// ⭐ v2.75a: 기능 업데이트 소식 — 배포할 때 여기에 항목을 추가하면 알림 센터에 표시됩니다 (최신이 위).
+//   '정보' 분류라 미확인 뱃지(긴급·경고만 카운트)에는 영향 없음.
+// ⭐ KICC v1.3b: KICC 대시보드 자체 소식만 표시
+const UPDATE_NOTES = [
+  { date: '2026-09-21', title: '🎉 KICC AS 현황 대시보드 오픈', msg: 'KICC 전용 AS 현황 대시보드가 오픈되었습니다. 수리 현황, 출고 이력, 불량 분석, 재인입 추적을 실시간으로 확인할 수 있으며, 비용은 견적서 기준 작업별 단가(부품·공임 포함, VAT 포함)로 표시됩니다.' },
+];
+
+function generateAlerts() {
+  const alerts = [];
+  const data = state.filtered;
+  const ship = state.filteredShip || [];
+  const stock = (state.raw && state.raw.stock) || [];
+  const now = new Date();
+
+  // 상대시간 계산 헬퍼 ("3일 전", "2시간 전" 등)
+  const relTime = (d) => {
+    if(!d) return '';
+    const t = d instanceof Date ? d : new Date(d);
+    if(isNaN(t)) return '';
+    const diffMs = now - t;
+    const min = Math.floor(diffMs / 60000);
+    if(min < 1) return '방금 전';
+    if(min < 60) return `${min}분 전`;
+    const hr = Math.floor(min / 60);
+    if(hr < 24) return `${hr}시간 전`;
+    const day = Math.floor(hr / 24);
+    if(day < 30) return `${day}일 전`;
+    const mo = Math.floor(day / 30);
+    return `${mo}개월 전`;
+  };
+
+  // ── 1) 14일 이상 미출고 (등록 후 STALE_DAYS 초과 + 미출고) ──
+  const shippedSerials = new Set(ship.map(s => s.serial));
+  const pending = data.filter(e => !shippedSerials.has(e.serial));
+  const stale = pending.filter(e => {
+    const repairDate = new Date(e.date);
+    const deadline = new Date(repairDate.getTime() + STALE_DAYS*86400000);
+    return now > deadline;
+  }).sort((a,b) => new Date(a.date) - new Date(b.date)); // 오래된 순
+
+  if(stale.length > 0) {
+    const sample = stale.slice(0,2).map(e => e.serial).join(', ');
+    const oldest = new Date(stale[0].date);
+    const daysSince = Math.floor((now - oldest) / 86400000);
+    alerts.push({
+      kind:'urgent', icon:'!',
+      title:`${STALE_DAYS}일 이상 미출고 — ${stale.length}건`,
+      msg:`등록 후 ${STALE_DAYS}일 넘게 미출고: ${sample}${stale.length>2?` 외 ${stale.length-2}건`:''} · 가장 오래된 건은 ${daysSince}일 경과 · 누락 여부 확인 필요`,
+      time: relTime(oldest) + ' 등록',
+    });
+  }
+
+  // ── 2) 이번 달 절감 효과 (수리량 · 새제품 구매 대비) — 긍정 지표 ──
+  //   고객 관점: 수리로 처리한 만큼 새 제품 구매비를 아낀 효과를 보여줌
+  const _NEW_P = (state.raw && state.raw.priceSettings && Number(state.raw.priceSettings.newProduct)) || NEW_UNIT_PRICE;
+  const _byMonth = {};
+  data.forEach(e => {
+    const ym = fmt.ym(e.date);
+    if(!ym) return;
+    (_byMonth[ym] = _byMonth[ym] || { cnt:0, fee:0 }).cnt++;
+    _byMonth[ym].fee += kiccTotal(e);   // ⭐ KICC v1.3: KICC 청구 기준
+  });
+  const _ms = Object.keys(_byMonth).sort();
+  if(_ms.length) {
+    const curYM = _ms[_ms.length-1];
+    const cur = _byMonth[curYM];
+    const prev = _ms.length >= 2 ? _byMonth[_ms[_ms.length-2]] : null;
+    const saved = Math.max(cur.cnt * _NEW_P - cur.fee, 0);   // 새제품 구매 대비 절감
+    const diff = prev ? cur.cnt - prev.cnt : 0;
+    const growMsg = (prev && diff > 0)
+      ? ` · 전월 대비 수리 +${fmt.num(diff)}건 → 절감 효과가 더 커졌습니다`
+      : '';
+    alerts.push({
+      kind:'info', icon:'💰',
+      title:`${curYM} 절감 효과 약 ${fmt.won(saved)}`,
+      msg:`${curYM} 수리 ${fmt.num(cur.cnt)}건 완료 · 새 제품 구매(대당 ${fmt.won(_NEW_P)}) 대신 수리로 약 ${fmt.won(saved)}를 아꼈습니다${growMsg}`,
+      time:`${curYM} 기준`,
+    });
+  }
+
+  // ── 4) 부품 재고 부족 (재고 시트 채워지면 자동 활성화) ──
+  // 재고 항목 형태: { name, qty, minQty } 가정
+  const lowStock = stock.filter(s => {
+    const qty = Number(s.qty || 0);
+    const minQty = Number(s.minQty || 0);
+    return minQty > 0 && qty < minQty;
+  });
+  if(lowStock.length > 0) {
+    const sample = lowStock.slice(0,2).map(s => `${s.name}(${s.qty}/${s.minQty})`).join(', ');
+    alerts.push({
+      kind:'warn', icon:'📦',
+      title:`부품 재고 부족 — ${lowStock.length}종`,
+      msg:`곧 소진 예상: ${sample}${lowStock.length>2?` 외 ${lowStock.length-2}종`:''} · 원활한 수리를 위해 부품 발주를 준비 중입니다`,
+      time: '현재',
+    });
+  }
+
+  // ── 우선순위 정렬: urgent > warn > info ──
+  const order = { urgent: 0, warn: 1, info: 2, ok: 3 };
+  alerts.sort((a,b) => (order[a.kind] ?? 99) - (order[b.kind] ?? 99));
+
+  // ⭐ v2.75a: 기능 업데이트 소식을 알림 목록 끝에 추가 (정보 분류 — 뱃지 미포함)
+  UPDATE_NOTES.forEach(u => alerts.push({ kind: 'info', title: u.title, msg: u.msg, time: u.date + ' 업데이트' }));
+
+  state.alerts = alerts;
+
+  // 사이드바/탭 뱃지 (긴급 + 경고만 카운트)
+  const urgentCount = alerts.filter(a => a.kind === 'urgent' || a.kind === 'warn').length;
+  // ⭐ 읽음 처리: 알림 구성이 마지막으로 확인한 것과 같으면 뱃지 숨김
+  window._alertSig = alerts.map(a => a.title).join('|');
+  let _seen = '';
+  try { _seen = localStorage.getItem('kicc_alerts_seen') || ''; } catch(e) {}
+  const _badgeN = (_seen === window._alertSig) ? 0 : urgentCount;
+  document.getElementById('sb-alert-badge').textContent = _badgeN;
+  document.getElementById('tab-alert-badge').textContent = _badgeN;
+  document.getElementById('sb-alert-badge').style.display = _badgeN ? 'flex':'none';
+  document.getElementById('tab-alert-badge').style.display = _badgeN ? 'flex':'none';
+}
+
+function renderAlerts() {
+  const filter = state.alertFilter;
+  const list = filter === 'all' ? state.alerts : state.alerts.filter(a => a.kind === filter);
+  const root = document.getElementById('alert-list');
+  if(!list.length) { root.innerHTML = '<div class="empty">알림이 없습니다</div>'; return; }
+
+  const KIND_ICONS = {
+    urgent: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+    warn:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+    info:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+    ok:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>',
+  };
+  const KIND_LABEL = { urgent:'긴급', warn:'경고', info:'정보', ok:'정보' };
+
+  root.innerHTML = list.map(a => `
+    <div class="alert-item ${a.kind}">
+      <div class="alert-icon">${KIND_ICONS[a.kind]}</div>
+      <div class="alert-body">
+        <div class="alert-title">${a.title}</div>
+        <div class="alert-msg">${a.msg}</div>
+        <div class="alert-time">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          ${a.time}
+        </div>
+      </div>
+      <div class="alert-tag">${KIND_LABEL[a.kind]}</div>
+    </div>
+  `).join('');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ *  TAB SWITCH
+ * ═════════════════════════════════════════════════════════════ */
+const RE_REASONS = {
+  defect: { label: '증상 재발',      color: '#ef4444', bg: '#fef2f2' },
+  newdefect: { label: '타 불량 발생', color: '#8b5cf6', bg: '#f5f3ff' },   // ⭐ v2.70v: 기존 수리와 다른 새 증상 — 재발 아님
+  store:  { label: '매장/고객 과실', color: '#d97706', bg: '#fffbeb' },
+  task:   { label: '단순 작업 요청', color: '#2563eb', bg: '#eff6ff' },
+  etc:    { label: '기타',           color: '#64748b', bg: '#f8fafc' }
+};
+// ⭐ v2.70v: 구형 '기타' 기록 중 메모가 '추가 발견/타 불량' 계열이면 표시상 타 불량 발생으로 재분류
+function _reClassRs(r) {
+  if(!r) return 'etc';
+  if(r.rs === 'etc' && /추가 발견|추가 발생|다른 불량|타 불량|새 증상|새로운 불량|추가로 발견/.test(String(r.memo || ''))) return 'newdefect';
+  return r.rs;
+}
+function _reParse(e) {
+  try { const r = JSON.parse(e.reentry || ''); return (r && r.v >= 2) ? r : null; } catch(_) { return null; }
+}
+function _reTag(rs, small) {
+  const c = RE_REASONS[rs] || RE_REASONS.etc;
+  return `<span style="display:inline-block;font-size:${small?'10.5':'11'}px;font-weight:700;padding:1px 8px;border-radius:99px;background:${c.bg};color:${c.color};border:1px solid ${c.color}44;white-space:nowrap;">${c.label}</span>`;
+}
+function renderReentry() {
+  const data = state.filtered || [];
+  const kpiEl = document.getElementById('reentry-kpis');
+  const bodyEl = document.getElementById('reentry-body');
+  const cntEl = document.getElementById('reentry-count');
+  if(!kpiEl || !bodyEl) return;
+
+  const reEntries = data.filter(e => _reParse(e));
+  const bySerial = {};
+  data.forEach(e => { (bySerial[e.serial] = bySerial[e.serial] || []).push(e); });
+  const groups = Object.entries(bySerial)
+    .filter(([, arr]) => arr.some(e => _reParse(e)))
+    .map(([serial, arr]) => {
+      const sorted = arr.slice().sort((a, b) => new Date(a.date) - new Date(b.date));
+      const timeline = sorted.map(e => ({ e, r: _reParse(e) }));
+      const lastRe = timeline.filter(x => x.r).pop();
+      return { serial, visits: sorted.length, timeline,
+               lastReDate: lastRe ? lastRe.e.date : sorted[sorted.length-1].date,
+               cur: sorted[sorted.length-1] };
+    })
+    .sort((a, b) => new Date(b.lastReDate) - new Date(a.lastReDate));
+
+  const cnt = { defect: 0, newdefect: 0, store: 0, task: 0, etc: 0 };
+  reEntries.forEach(e => { const r = _reParse(e); const k = _reClassRs(r); cnt[k] = (cnt[k] || 0) + 1; });
+  const tot = reEntries.length;
+  const _center = 'display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;';
+  const kpiCard = (k) => {
+    const c = RE_REASONS[k];
+    const pct = tot ? (cnt[k] / tot * 100).toFixed(0) : 0;
+    return `<div class="kpi" style="${_center}border-top:3px solid ${c.color};">
+      <div class="kpi-label">${c.label}</div>
+      <div class="kpi-value" style="color:${c.color};">${cnt[k]}<span class="unit">건</span></div>
+      <div class="kpi-foot">재인입의 ${pct}%</div>
+    </div>`;
+  };
+  kpiEl.style.gridTemplateColumns = 'repeat(6, 1fr)';   // ⭐ v2.70y: 기타 카드 포함 6장 — 어느 분류도 숨지 않게
+  kpiEl.innerHTML = ['defect', 'newdefect', 'store', 'task', 'etc'].map(kpiCard).join('') + `
+    <div class="kpi" style="${_center}">
+      <div class="kpi-label">재인입 총계</div>
+      <div class="kpi-value">${tot}<span class="unit">건</span></div>
+      <div class="kpi-foot">기기 ${groups.length}대</div></div>`;
+  if(cntEl) cntEl.textContent = `${groups.length}대 · ${tot}건`;
+
+  if(!groups.length) {
+    bodyEl.innerHTML = `<div style="padding:32px;text-align:center;color:var(--text-3);font-size:13px;">재인입(재전달) 기록이 없습니다.</div>`;
+    return;
+  }
+
+  bodyEl.innerHTML = groups.map(g => {
+    const shipped = String(g.cur.status) === 'shipped';
+    const steps = g.timeline.map((x, i) => {
+      const d = String(x.e.date).slice(0, 10);
+      return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;flex-wrap:wrap;">
+        <span style="font-size:11px;font-weight:800;color:var(--text-3);min-width:34px;">${i + 1}차</span>
+        <span style="font-size:11.5px;font-family:monospace;color:var(--text-2);min-width:82px;">${d}</span>
+        ${x.r ? _reTag(_reClassRs(x.r), true) : '<span style="font-size:10.5px;color:var(--text-3);">최초 수리</span>'}
+        ${x.r && x.r.memo ? `<span style="font-size:11px;color:var(--text-3);">— ${x.r.memo}</span>` : ''}
+      </div>`;
+    }).join('');
+    return `<div style="border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+        <div style="font-weight:800;font-family:monospace;font-size:13.5px;">${g.serial}
+          <span style="font-size:11px;font-weight:700;color:#be123c;background:#fff1f2;border:1px solid #fda4af;padding:1px 8px;border-radius:99px;margin-left:8px;">총 ${g.visits}회 수리</span>
+        </div>
+        <span style="font-size:11px;font-weight:700;padding:2px 10px;border-radius:99px;${shipped ? 'background:#f0fdf4;color:#15803d;border:1px solid #86efac;' : 'background:#fefce8;color:#a16207;border:1px solid #fde047;'}">${shipped ? '출고 완료' : '수리 진행 중'}</span>
+      </div>
+      ${steps}
+    </div>`;
+  }).join('');
+}
+
+function activateTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.sb-item[data-tab]').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.tab-pane').forEach(p => {
+    const isTarget = p.id === 'pane-' + name;
+    p.classList.toggle('active', isTarget);
+    p.hidden = !isTarget;
+  });
+  // 탭별 lazy render (이미 렌더된 경우 다시 안 그림)
+  if(name === 'shipping' && !state.charts._shipDone) { renderShipping(); state.charts._shipDone = true; }
+  if(name === 'unrepair') { try { renderExchange(); } catch(e) {} }
+  if(name === 't2n') { try { renderT2NQuality(); } catch(e) {} }   // ⭐ v2.75h: T2N 품질 탭
+  if(name === 'reentry') { try { renderReentry(); } catch(e) {} }
+  if(name === 'alerts') {
+    // ⭐ 알림 확인 → 읽음 처리 (뱃지 제거)
+    try { localStorage.setItem('kicc_alerts_seen', window._alertSig || ''); } catch(e) {}
+    const sb = document.getElementById('sb-alert-badge'), tb = document.getElementById('tab-alert-badge');
+    if(sb) sb.style.display = 'none';
+    if(tb) tb.style.display = 'none';
+  }
+  if(name === 'analysis' && !state.charts.quarter) {
+    renderQuarter(); renderWorktype(); renderHeatmap();
+  }
+  if(name === 'alerts') renderAlerts();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ *  EXCEL EXPORT (CSV)
+ * ═════════════════════════════════════════════════════════════ */
+// 라이브러리 로드 대기 (최대 5초)
+function waitForXLSX(retries = 10) {
+  return new Promise((resolve, reject) => {
+    if(typeof XLSX !== 'undefined') { resolve(); return; }
+    if(retries <= 0) { reject(new Error('XLSX 라이브러리 로드 실패')); return; }
+    setTimeout(() => waitForXLSX(retries - 1).then(resolve).catch(reject), 500);
+  });
+}
+
+/* ⭐ v2.75g: 수리 불가(교품) 내역 엑셀 — 화면(수리 불가 탭)과 같은 목록·순서·필터로 내보내기 */
+async function exportExchangeExcel() {
+  const { rows, ex, exAll } = _exchangeRows();
+  if(!rows.length) { toast('내보낼 수리 불가 내역이 없습니다', 'error'); return; }
+  try {
+    if(typeof XLSX === 'undefined') {
+      toast('엑셀 라이브러리 로딩 중...', 'info');
+      await waitForXLSX(10);
+    }
+  } catch(err) {
+    toast('엑셀 라이브러리 로드 실패. 페이지 새로고침 후 다시 시도해주세요.', 'error');
+    return;
+  }
+  // 조회 조건 명시 (출고 엑셀과 동일한 원칙 — 필터 걸린 자료인지 파일만 봐도 알 수 있게)
+  const _f = state.filter || {};
+  const _cond = [];
+  _cond.push('기간: ' + (_f.dateFrom || _f.dateTo ? (_f.dateFrom || '처음') + ' ~ ' + (_f.dateTo || '오늘')
+    : _f.period === 'thisMonth' ? '이번 달' : _f.period === 'lastMonth' ? '지난 달' : '전체'));
+  if(_f.year && _f.year !== 'all') _cond.push('연도: ' + _f.year);
+  if(_f.quarter && _f.quarter !== 'all') _cond.push('분기: ' + _f.quarter);
+  _cond.push('기종: ' + (_f.model === 'all' ? '전체' : _f.model));
+  if(window._excModelF && window._excModelF !== 'all') _cond.push('기종 칩: ' + window._excModelF);
+  if(_f.serial) _cond.push('시리얼 검색: ' + _f.serial);
+  const today = new Date().toISOString().slice(0, 10);
+  const aoa = [
+    ['수리 불가 처리 내역 (비용 초과)'],
+    ['조회 조건: ' + _cond.join(' · ')],
+    ['조회 ' + rows.length + '건' + (rows.length !== exAll.length ? ' / 전체 ' + exAll.length + '건' : '') + ' · 내보낸 날짜: ' + today],
+    [],
+    ['No', '처리일', '시리얼 번호', '기종', '처리 사유', '예상 수리비(원)'],
+    ...rows.map((x, i) => [
+      i + 1,
+      x.date ? String(fmt.date(x.date)) : '',
+      String(x.serial || ''),
+      String(x.model || '').replace(/_N$/i, ''),
+      '비용 초과',
+      Number(x.estimatedCost) > 0 ? Number(x.estimatedCost) : ''
+    ])
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 5 }, { wch: 12 }, { wch: 18 }, { wch: 10 }, { wch: 14 }, { wch: 14 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '수리불가 내역');
+  XLSX.writeFile(wb, `수리불가_현황_${today}.xlsx`);
+  toast(`수리 불가 내역 ${rows.length}건을 엑셀로 내보냈습니다`);
+}
+
+async function exportExcel() {
+  // ⭐ v2.75g: 수리 불가(교품) 탭이 열려 있으면 그 탭의 데이터를 내보냄 — 보고 있는 화면 = 내보내는 파일
+  const _activeTab = document.querySelector('.tab.active')?.dataset.tab;
+  if(_activeTab === 'unrepair') { return exportExchangeExcel(); }
+  // ⭐ v2.74: 화면의 출고 목록과 '완전히 같은 목록·같은 순서'로 내보내기 (No. 일치)
+  //   + 출고일 컬럼 추가 — 엑셀에서 출고일 기준 오름/내림차순 정렬 가능
+  const shipRows = computeShipRows();
+  if(!shipRows.length) { toast('내보낼 데이터가 없습니다','error'); return; }
+
+  // SheetJS 로드 대기 (최대 5초)
+  try {
+    if(typeof XLSX === 'undefined') {
+      toast('엑셀 라이브러리 로딩 중...','info');
+      await waitForXLSX(10); // 0.5초 × 10회 = 5초
+    }
+  } catch(err) {
+    toast('엑셀 라이브러리 로드 실패. 페이지 새로고침 후 다시 시도해주세요.','error');
+    return;
+  }
+
+  // ⭐ v2.72: 조회 조건을 파일에 명시 — 필터가 걸린 자료인지 나중에도 구분 가능하도록 (월 마감 대사 혼선 방지)
+  const _f = state.filter;
+  const _condParts = [];
+  _condParts.push('기간: ' + (_f.dateFrom || _f.dateTo ? (_f.dateFrom || '처음') + ' ~ ' + (_f.dateTo || '오늘')
+    : _f.period === 'thisMonth' ? '이번 달' : _f.period === 'lastMonth' ? '지난 달' : '전체'));
+  if(_f.year && _f.year !== 'all') _condParts.push('연도: ' + _f.year);
+  if(_f.quarter && _f.quarter !== 'all') _condParts.push('분기: ' + _f.quarter);
+  _condParts.push('기종: ' + (_f.model === 'all' ? '전체' : _f.model));
+  if(_f.worktype && _f.worktype !== 'all') _condParts.push('작업: ' + (_f.worktype === 'single' ? '단일' : '복합'));
+  if(_f.serial) _condParts.push('시리얼 검색: ' + _f.serial);
+  const _condStr = _condParts.join(' · ');
+  const _doneRows = shipRows.filter(r => r.status === '출고완료');
+  const _sumBilledX = _doneRows.reduce((s,r) => s + (r.billed||0), 0);
+
+  // 데이터 헤더 + 행 (화면 출고 목록과 동일 순서 — No. 일치)
+  const rows = [
+    ['조회 조건', _condStr],
+    ['합계', '출고완료 ' + _doneRows.length + '건 / ' + _sumBilledX.toLocaleString('ko-KR') + '원' +
+      (shipRows.length > _doneRows.length ? ' · 출고대기 ' + (shipRows.length - _doneRows.length) + '건' : '')],
+    [],
+    ['No','시리얼번호','기종','수리항목','출고일','재인입','청구금액','상태'],
+    ...shipRows.map(r => [
+      r.no,
+      r.serial,
+      r.model || '',
+      r.works || '',
+      r.shipDay || '-',
+      (r.visit && r.visit >= 2) ? (r.visit + '차') : '1차',   // ⭐ v2.75: 재인입 회차
+      r.billed,
+      r.status,
+    ]),
+  ];
+
+  // 시트 생성
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+
+  // 컬럼 너비 설정
+  ws['!cols'] = [
+    {wch:6},  // No
+    {wch:22}, // 시리얼번호
+    {wch:12}, // 기종
+    {wch:34}, // 수리항목
+    {wch:12}, // 출고일
+    {wch:8},  // 재인입
+    {wch:12}, // 청구금액
+    {wch:10}, // 상태
+  ];
+
+  // 숫자 포맷 — 데이터는 5행부터(조건 2행+빈줄+헤더). 청구금액=G열(index 6)
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for(let R = 4; R <= range.e.r; R++) {
+    const cAmt = XLSX.utils.encode_cell({r:R, c:6});
+    if(ws[cAmt]) { ws[cAmt].t = 'n'; ws[cAmt].z = '#,##0'; }
+  }
+
+  // 워크북 생성 + 시트 추가
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'AS 현황');
+
+  // 파일 다운로드
+  const today = new Date().toISOString().slice(0,10);
+  // ⭐ v2.72: 기종 필터가 걸려 있으면 파일명에도 표기 — 전체 자료와 헷갈리지 않게
+  const _fnTag = (_f.model && _f.model !== 'all') ? '_' + _f.model : '';
+  XLSX.writeFile(wb, `AS_현황_${today}${_fnTag}.xlsx`);
+  toast('엑셀 파일로 내보냈습니다' + (_fnTag ? ` (기종 필터: ${_f.model})` : ''));
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ *  EVENTS / INIT
+ * ═════════════════════════════════════════════════════════════ */
+function initFilters() {
+  // 제조년월 필터는 제거됨 — f-yymm 없으면 스킵
+  const sel = document.getElementById('f-yymm');
+  if(!sel) return;
+  const all = state.raw.entries || [];
+  const yymms = new Set();
+  all.forEach(e => { const y = extractYYMM(e.serial); if(y) yymms.add(y); });
+  sel.innerHTML = '<option value="all">전체</option>' +
+    Array.from(yymms).sort().reverse().map(y => `<option value="${y}">${y}</option>`).join('');
+}
+
+function bindEvents() {
+  // Sidebar / Tab navigation
+  document.querySelectorAll('.tab[data-tab], .sb-item[data-tab]').forEach(btn => {
+    btn.addEventListener('click', () => activateTab(btn.dataset.tab));
+  });
+
+  // Period 세그먼트 버튼
+  document.querySelectorAll('.seg-btn[data-period]').forEach(c => {
+    c.addEventListener('click', () => {
+      document.querySelectorAll('.seg-btn[data-period]').forEach(x => x.classList.remove('active'));
+      c.classList.add('active');
+      state.filter.period = c.dataset.period;
+      state.filter.dateFrom = ''; state.filter.dateTo = '';
+      const df = document.getElementById('f-date-from'); if(df) df.value = '';
+      const dt = document.getElementById('f-date-to'); if(dt) dt.value = '';
+      refresh();
+    });
+  });
+  // Alert chips
+  document.querySelectorAll('.chip[data-alert]').forEach(c => {
+    c.addEventListener('click', () => {
+      document.querySelectorAll('.chip[data-alert]').forEach(x => x.classList.remove('active'));
+      c.classList.add('active');
+      state.alertFilter = c.dataset.alert;
+      renderAlerts();
+    });
+  });
+
+  // 출고연도 (드롭다운 유지)
+  document.getElementById('f-year').addEventListener('change', e => { state.filter.year = e.target.value; refresh(); });
+  // 분기 / 기종 / 수리유형 칩 그룹 — 공통 핸들러
+  const bindChipGroup = (groupId, attr, key) => {
+    const grp = document.getElementById(groupId);
+    if(!grp) return;
+    grp.querySelectorAll('.chip2').forEach(c => {
+      c.addEventListener('click', () => {
+        grp.querySelectorAll('.chip2').forEach(x => x.classList.remove('active'));
+        c.classList.add('active');
+        state.filter[key] = c.dataset[attr];
+        refresh();
+      });
+    });
+  };
+  bindChipGroup('cg-quarter', 'quarter', 'quarter');
+  bindChipGroup('cg-model', 'model', 'model');
+  bindChipGroup('cg-worktype', 'worktype', 'worktype');
+  // 시리얼 검색
+  document.getElementById('f-serial').addEventListener('input', e => { state.filter.serial = e.target.value; });
+  document.getElementById('f-serial').addEventListener('keydown', e => { if(e.key === 'Enter') refresh(); });
+  // 날짜 직접 지정 (선택 시 기간 세그먼트는 '전체'로 표시 해제 효과)
+  // ⭐ 날짜 입력 아무 곳이나 클릭해도 달력 열기 (아이콘만 반응하던 불편 해소)
+  ['f-date-from','f-date-to'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) {
+      el.style.cursor = 'pointer';
+      el.addEventListener('click', () => { try { el.showPicker(); } catch(e) {} });
+    }
+  });
+
+  document.getElementById('f-date-from').addEventListener('change', e => {
+    state.filter.dateFrom = e.target.value;
+    state.filter.period = 'all';
+    document.querySelectorAll('.seg-btn[data-period]').forEach(x => x.classList.toggle('active', x.dataset.period === 'all'));
+    refresh();
+  });
+  document.getElementById('f-date-to').addEventListener('change', e => {
+    state.filter.dateTo = e.target.value;
+    state.filter.period = 'all';
+    document.querySelectorAll('.seg-btn[data-period]').forEach(x => x.classList.toggle('active', x.dataset.period === 'all'));
+    refresh();
+  });
+
+  document.getElementById('btn-search').addEventListener('click', refresh);
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    state.filter = { period:'all', quarter:'all', year:'all', dateFrom:'', dateTo:'', model:'all', yymm:'all', worktype:'all', serial:'' };
+    document.querySelectorAll('.seg-btn[data-period]').forEach(c => c.classList.toggle('active', c.dataset.period === 'all'));
+    // 칩 그룹들 '전체'로 리셋
+    [['cg-quarter','quarter'],['cg-model','model'],['cg-worktype','worktype']].forEach(([gid]) => {
+      const grp = document.getElementById(gid);
+      if(grp) grp.querySelectorAll('.chip2').forEach(c => c.classList.toggle('active', c.dataset[gid.replace('cg-','')] === 'all'));
+    });
+    const setVal = (id,v) => { const el = document.getElementById(id); if(el) el.value = v; };
+    setVal('f-year','all'); setVal('f-serial','');
+    setVal('f-date-from',''); setVal('f-date-to','');
+    refresh();
+  });
+
+  document.getElementById('btn-export').addEventListener('click', exportExcel);
+
+  // ── 라이트/다크 모드 토글 ──
+  document.getElementById('theme-toggle').addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('kicc-theme', next); } catch(e) {}
+    updateThemeButton();
+    // 차트 재렌더 (축/그리드 색상 다시 잡기 위해)
+    refresh();
+  });
+}
+
+function updateThemeButton() {
+  const cur = document.documentElement.getAttribute('data-theme') || 'light';
+  const btn = document.getElementById('theme-toggle');
+  if(!btn) return;
+  const span = btn.querySelector('span');
+  if(span) span.textContent = cur === 'dark' ? '라이트 모드' : '다크 모드';
+  // 아이콘도 살짝 바꾸기 (해 ↔ 달)
+  const svg = btn.querySelector('svg');
+  if(svg) {
+    svg.innerHTML = cur === 'dark'
+      ? '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>'
+      : '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+  }
+}
+
+// 페이지 로드 시 저장된 테마 즉시 적용 (FOUC 방지)
+(function() {
+  try {
+    const saved = localStorage.getItem('kicc-theme');
+    if(saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+  } catch(e) {}
+})();
+
+/* 모든 차트/카드 리렌더 */
+// 현재 필터 기준으로 제조년월 드롭다운 갱신
+function refreshYYMMOptions() {
+  const sel = document.getElementById('f-yymm');
+  if(!sel) return;
+  const opts = state.yymmOptions || [];
+  const currentYymm = state.filter.yymm;
+  sel.innerHTML = '<option value="all">전체</option>' +
+    opts.map(y => `<option value="${y}">${y}</option>`).join('');
+  // 현재 선택값이 새 옵션에 있으면 보존, 없으면 'all'로 리셋
+  if(currentYymm === 'all' || opts.includes(currentYymm)) {
+    sel.value = currentYymm;
+  } else {
+    state.filter.yymm = 'all';
+    sel.value = 'all';
+  }
+}
+
+function refresh() {
+  state.shippingPage = 1; // 필터 변경 시 페이지 초기화
+  applyFilter();
+  refreshYYMMOptions(); // 제조년월 옵션 갱신
+  // 모든 차트 destroy 후 다시 그리기 (탭이 활성화됐던 것만)
+  Object.keys(state.charts).forEach(k => destroyChart(k));
+  state.charts = {};
+  renderKPI();
+  try { renderT2NQuality(); } catch(e) { console.warn('[T2N 불량 분석]', e); }   // ⭐ v2.75g
+  renderDistribution();
+  renderMonthly();
+  renderYYMM();
+  renderWorkCost();   // ⭐ KICC v1.3: 비용 구조 분석 → 작업별 비용
+  renderComplexity();
+  renderTopCauses();
+  generateAlerts();
+  // 현재 활성 탭이 dashboard 외라면 그것도 다시
+  const activeTab = document.querySelector('.tab.active')?.dataset.tab;
+  if(activeTab === 'analysis') { renderQuarter(); renderWorktype(); renderHeatmap(); }
+  if(activeTab === 'shipping') renderShipping();
+  if(activeTab === 'unrepair') { try { renderExchange(); } catch(e) {} }
+  if(activeTab === 'alerts') renderAlerts();
+}
+
+async function init() {
+  updateThemeButton(); // 저장된 테마에 따라 버튼 라벨/아이콘 초기화
+  document.getElementById('loading').style.display = 'flex';
+  document.querySelectorAll('.tab-pane').forEach(p => p.hidden = true);
+
+  try {
+    state.raw = await loadData();
+
+    // ⭐ v2.72: 출고 이중 기록 방어 — 같은 시리얼+같은 날짜 중복 행은 첫 행만 사용
+    if(Array.isArray(state.raw.shipLog)) {
+      const _sdSeen = new Set();
+      state.raw.shipLog = state.raw.shipLog.filter(s => {
+        const d = new Date(s.shipDate);
+        const dk = isNaN(d) ? String(s.shipDate || '') : d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+        const k = String(s.serial || '') + '|' + dk;
+        if(_sdSeen.has(k)) return false;
+        _sdSeen.add(k);
+        return true;
+      });
+    }
+
+    // ⭐ 출고연도 드롭다운 채우기 (출고이력의 연도 추출)
+    populateYearOptions();
+
+    // ════ 디버그 로그 (자동 출력) ════
+    console.log('═══════════ [voltales-as 진단 정보] ═══════════');
+    console.log('📦 entries (수리 데이터):', (state.raw.entries || []).length, '건');
+    console.log('🚚 shipLog (출고 데이터):', (state.raw.shipLog || []).length, '건');
+
+    if(state.raw.shipLog && state.raw.shipLog.length > 0) {
+      // 날짜별 분포
+      const dateMap = {};
+      state.raw.shipLog.forEach(s => {
+        const d = String(s.shipDate || 'unknown').slice(0, 10);
+        dateMap[d] = (dateMap[d] || 0) + 1;
+      });
+      const dates = Object.keys(dateMap).sort();
+      console.log('📅 출고일별 분포:');
+      dates.forEach(d => console.log('   ' + d + ': ' + dateMap[d] + '건'));
+
+      // 가장 최근 5건
+      const sorted = [...state.raw.shipLog].sort((a, b) => {
+        return String(b.shipDate || '').localeCompare(String(a.shipDate || ''));
+      });
+      console.log('🕒 가장 최근 출고 5건:');
+      sorted.slice(0, 5).forEach((s, i) => {
+        console.log('   #' + (i+1) + ' ' + s.shipDate + ' / ' + s.serial + ' / ' + s.model);
+      });
+    } else {
+      console.warn('⚠️ shipLog 데이터가 없습니다!');
+    }
+    console.log('═══════════════════════════════════════════════');
+    // ════ 디버그 로그 끝 ════
+
+    // 업데이트 시간 표시
+    const now = new Date();
+    document.getElementById('last-update').textContent =
+      `${now.getFullYear()}. ${now.getMonth()+1}. ${now.getDate()}. ${now.getHours()<12?'오전':'오후'} ${(now.getHours()%12||12)}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+    initFilters();
+    bindEvents();
+    refresh();
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('pane-dashboard').hidden = false;
+
+    if(DEMO_MODE) {
+      toast('🧪 예시 데이터로 표시 중 (시연용)');
+      try {
+        const hd = document.querySelector('.header');
+        if(hd && !document.getElementById('demo-banner')) {
+          const b = document.createElement('div');
+          b.id = 'demo-banner';
+          b.style.cssText = 'margin:0 0 14px;padding:10px 16px;border-radius:10px;background:rgba(250,204,21,.12);border:1px solid rgba(250,204,21,.45);font-size:12.5px;font-weight:700;color:#b45309;';
+          b.textContent = '🧪 예시 데이터 화면입니다 — 실제 KICC 물량 데이터가 아니며, 연동 시 실시간 데이터로 자동 전환됩니다.';
+          hd.insertAdjacentElement('afterend', b);
+        }
+        const lu = document.getElementById('last-update');
+        if(lu) lu.textContent = '예시 데이터 (시연용)';
+      } catch(e) {}
+    }
+  } catch(err) {
+    console.error(err);
+    document.getElementById('loading').innerHTML =
+      `<div style="color:var(--c-rose);text-align:center"><div style="font-weight:700;margin-bottom:6px">데이터 로드 실패</div><div style="font-size:12px">${err.message || err}</div></div>`;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+
+</body>
+</html>
